@@ -124,8 +124,8 @@ DEFINES := \
 	-DCONFIG_EVENT_KEY_MAP_ENABLE=0 \
 	-DTIMER_POOL_NUM_CONFIG=10 \
 	-DAPP_ASYNC_POOL_NUM_CONFIG=0 \
-	-DSDK_VERSION_CFG_DEFINE=0x230003 \
-	-DSDK_VERSION_DATE_DEFINE=20240331 \
+	-DSDK_VERSION_CFG_DEFINE=0x240001 \
+	-DSDK_VERSION_DATE_DEFINE=20241231 \
 	-DVFS_ENABLE=1 \
 	-DUSE_SDFILE_NEW=1 \
 	-DVFS_FILE_POOL_NUM_CONFIG=0 \
@@ -387,6 +387,8 @@ c_SRC_FILES := \
 	../../../../apps/spp_and_le/examples/findmy/ble_fmy_fmna.c \
 	../../../../apps/spp_and_le/examples/findmy/ble_fmy_ota.c \
 	../../../../apps/spp_and_le/examples/findmy/ble_fmy_sensor_uart.c \
+	../../../../apps/spp_and_le/examples/ftms/app_ftms.c \
+	../../../../apps/spp_and_le/examples/ftms/ble_ftms.c \
 	../../../../apps/spp_and_le/examples/hilink/app_hilink.c \
 	../../../../apps/spp_and_le/examples/hilink/hilink_demo.c \
 	../../../../apps/spp_and_le/examples/idle/app_idle.c \

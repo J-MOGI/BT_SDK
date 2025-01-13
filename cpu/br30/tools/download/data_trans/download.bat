@@ -6,8 +6,9 @@ copy ..\..\script.ver .
 copy ..\..\tone.cfg .
 copy ..\..\p11_code.bin .
 copy ..\..\br30loader.bin .
+copy ..\..\flash_params.bin
 
-..\..\isd_download.exe ..\..\isd_config.ini -tonorflash -dev br30 -boot 0x2000 -div8 -wait 300 -uboot ..\..\uboot.boot -app ..\..\app.bin ..\..\cfg_tool.bin -res p11_code.bin tone.cfg -uboot_compress 
+..\..\isd_download.exe ..\..\isd_config.ini -tonorflash -dev br30 -boot 0x2000 -div8 -wait 300 -uboot ..\..\uboot.boot -app ..\..\app.bin ..\..\cfg_tool.bin -res p11_code.bin tone.cfg -uboot_compress -flash-params flash_params.bin
 :: -format all
 ::-reboot 2500
 

@@ -6,8 +6,9 @@ copy ..\..\script.ver .
 copy ..\..\tone.cfg .
 copy ..\..\p11_code.bin .
 copy ..\..\br34loader.bin .
+copy ..\..\flash_params.bin
 
-..\..\isd_download.exe ..\..\isd_config.ini -tonorflash -dev br34 -boot 0x20000 -div8 -wait 300 -uboot ..\..\uboot.boot -app ..\..\app.bin ..\..\cfg_tool.bin -res tone.cfg p11_code.bin -uboot_compress
+..\..\isd_download.exe ..\..\isd_config.ini -tonorflash -dev br34 -boot 0x20000 -div8 -wait 300 -uboot ..\..\uboot.boot -app ..\..\app.bin ..\..\cfg_tool.bin -res tone.cfg p11_code.bin -uboot_compress -flash-params flash_params.bin
 :: -format all
 ::-reboot 2500
 

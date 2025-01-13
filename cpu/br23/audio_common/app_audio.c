@@ -1447,7 +1447,44 @@ void _audio_adc_irq_hook(void)
     audio_adc_irq_handler(&adc_hdl);
 }
 
+struct dac_ch_delay_config {
+    u32 delay_time;
+    u32 protect_time;
+    u32 start_delay;
+};
 
+static struct dac_ch_delay_config dac_ch_delay_cfg = {0};
+
+/*
+*********************************************************************
+*                  Set Dac Channel Delay Time
+* Description: 设置DAC 通道的启动延时
+* Arguments  : dac_delay_ms			启动延时(单位：ms,传0代表使用默认配置)
+*			   save_last_config_en	是否保存上一次DAC的延时配置(1:保存，0：不保存)
+* Return	 : NULL
+* Note(s)    : 该接口用于设置DAC通道启动的延时
+*********************************************************************
+*/
+void set_dac_start_delay_time(u16 dac_delay_ms, u8 save_last_config_en)
+{
+    struct audio_dac_channel_attr attr;
+    audio_dac_channel_get_attr(&default_dac, &attr);
+    if (save_last_config_en) {
+        dac_ch_delay_cfg.delay_time = attr.delay_time;
+        dac_ch_delay_cfg.start_delay = attr.start_delay;
+        dac_ch_delay_cfg.protect_time = attr.protect_time;
+    }
+    if (dac_delay_ms) {
+        attr.start_delay = dac_delay_ms;
+        attr.protect_time = 0;
+        audio_dac_channel_set_attr(&default_dac, &attr);
+    } else {
+        attr.delay_time = dac_ch_delay_cfg.delay_time;
+        attr.protect_time = dac_ch_delay_cfg.protect_time;
+        attr.start_delay = dac_ch_delay_cfg.start_delay;
+        audio_dac_channel_set_attr(&default_dac, &attr);
+    }
+}
 
 /*******************************************************
 * Function name	: app_audio_output_init

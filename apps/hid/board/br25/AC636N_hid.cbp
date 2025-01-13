@@ -49,8 +49,8 @@
 <Add option="-DCONFIG_EVENT_KEY_MAP_ENABLE=0" />
 <Add option="-DTIMER_POOL_NUM_CONFIG=10" />
 <Add option="-DAPP_ASYNC_POOL_NUM_CONFIG=0" />
-<Add option="-DSDK_VERSION_CFG_DEFINE=0x230003" />
-<Add option="-DSDK_VERSION_DATE_DEFINE=20240331" />
+<Add option="-DSDK_VERSION_CFG_DEFINE=0x240001" />
+<Add option="-DSDK_VERSION_DATE_DEFINE=20241231" />
 <Add option="-DVFS_ENABLE=1" />
 <Add option="-DUSE_SDFILE_NEW=1" />
 <Add option="-DVFS_FILE_POOL_NUM_CONFIG=0" />
@@ -166,6 +166,7 @@
 <Add option="../../../../cpu/br25/liba/wtgv2_dec_lib.a" />
 <Add option="../../../../cpu/br25/liba/wav_dec_lib.a" />
 <Add option="../../../../cpu/br25/liba/mp3_dec_lib.a" />
+<Add option="../../../../cpu/br25/liba/lib_pitch_speed.a" />
 <Add option="../../../../cpu/br25/liba/lib_midi_dec.a" />
 <Add option="--end-group" />
 <Add option="-T../../../../cpu/br25/sdk.ld" />
@@ -501,6 +502,7 @@
 <Unit filename="../../../../include_lib/driver/device/usb/otg.h" />
 <Unit filename="../../../../include_lib/driver/device/usb/scsi.h" />
 <Unit filename="../../../../include_lib/driver/device/usb/usb_phy.h" />
+<Unit filename="../../../../include_lib/media/audio_eq.h" />
 <Unit filename="../../../../include_lib/media/audio_stream.h" />
 <Unit filename="../../../../include_lib/media/localtws_decoder.h" />
 <Unit filename="../../../../include_lib/media/media_develop/media/MIDI_CTRL_API.h" />

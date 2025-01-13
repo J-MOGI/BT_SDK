@@ -11,6 +11,7 @@
 #include "bt_common.h"
 #include "api/sig_mesh_api.h"
 #include "model_api.h"
+#include "feature_correct.h"
 
 #define LOG_TAG             "[Mesh-OnOff_srv]"
 #define LOG_ERROR_ENABLE
@@ -27,16 +28,6 @@
 #endif/*TCFG_AUDIO_ENABLE*/
 
 #if (CONFIG_MESH_MODEL == SIG_MESH_GENERIC_ONOFF_SERVER)
-
-extern u16_t primary_addr;
-extern void mesh_setup(void (*init_cb)(void));
-extern void gpio_pin_write(u8_t led_index, u8_t onoff);
-extern void bt_mac_addr_set(u8 *bt_addr);
-extern void prov_complete(u16_t net_idx, u16_t addr);
-extern void prov_reset(void);
-extern uint32_t btctler_get_rand_from_assign_range(uint32_t rand, uint32_t min, uint32_t max);
-extern void pseudo_random_genrate(uint8_t *dest, unsigned size);
-extern void ble_bqb_test_thread_init(void);
 /**
  * @brief Config current node features(Relay/Proxy/Friend/Low Power)
  */
@@ -46,49 +37,16 @@ extern void ble_bqb_test_thread_init(void);
                                                 BT_MESH_FEAT_PROXY | \
                                                 0 \
                                             )
-#include "feature_correct.h"
-const int config_bt_mesh_features = BT_MESH_FEAT_SUPPORTED;
-
-/**
- * @brief Config proxy connectable adv hardware param
- */
-/*-----------------------------------------------------------*/
-#if BT_MESH_FEATURES_GET(BT_MESH_FEAT_LOW_POWER)
-const u16 config_bt_mesh_proxy_node_adv_interval = ADV_SCAN_UNIT(3000); // unit: ms
-#else
-const u16 config_bt_mesh_proxy_node_adv_interval = ADV_SCAN_UNIT(300); // unit: ms
-#endif /* BT_MESH_FEATURES_GET(BT_MESH_FEAT_LOW_POWER) */
-
 /**
  * @brief Conifg complete local name
  */
 /*-----------------------------------------------------------*/
-
-static u8 ble_mesh_adv_name[32 + 2];
-
-#define BLE_DEV_NAME        'O', 'n', 'O', 'f', 'f', '_', 's', 'r', 'v'
-
-const uint8_t mesh_default_name[] = {
-    // Name
-    BYTE_LEN(BLE_DEV_NAME) + 1, BLUETOOTH_DATA_TYPE_COMPLETE_LOCAL_NAME, BLE_DEV_NAME,
-};
-
-void get_mesh_adv_name(u8 *len, u8 **data)
-{
-
-    //r_printf("==============================%s,%d\n", __FUNCTION__, __LINE__);
-    //put_buf(ble_mesh_adv_name,32);
-
-    *len = ble_mesh_adv_name[0] + 1;
-    *data = ble_mesh_adv_name;
-
-}
-
+#define BLE_DEV_NAME                'O', 'n', 'O', 'f', 'f', '_', 's', 'r', 'v'
 /**
  * @brief Conifg MAC of current demo
  */
 /*-----------------------------------------------------------*/
-#define CUR_DEVICE_MAC_ADDR         0x222233445567
+#define CUR_DEVICE_MAC_ADDR         0x852233445567
 
 /*
  * Publication Declarations
@@ -107,6 +65,7 @@ void get_mesh_adv_name(u8 *len, u8 **data)
  *
  */
 BT_MESH_MODEL_PUB_DEFINE(gen_onoff_pub_srv, NULL, 2 + 2);
+BT_MESH_HEALTH_PUB_DEFINE(health_pub, 0);
 
 /* Model Operation Codes */
 #define BT_MESH_MODEL_OP_GEN_ONOFF_GET			BT_MESH_MODEL_OP_2(0x82, 0x01)
@@ -120,17 +79,7 @@ BT_MESH_MODEL_PUB_DEFINE(gen_onoff_pub_srv, NULL, 2 + 2);
 /* LED NUMBER */
 #define LED0_GPIO_PIN           0
 
-/*
- * Server Configuration Declaration
- */
-static struct bt_mesh_cfg_srv cfg_srv = {
-    .relay          = BT_MESH_FEATURES_GET(BT_MESH_FEAT_RELAY),
-    .frnd           = BT_MESH_FEATURES_GET(BT_MESH_FEAT_FRIEND),
-    .gatt_proxy     = BT_MESH_FEATURES_GET(BT_MESH_FEAT_PROXY),
-    .beacon         = BT_MESH_BEACON_DISABLED,
-    .default_ttl    = 7,
-};
-
+// -----------------------------------------------------------
 struct onoff_state {
     u8_t current;
     u8_t previous;
@@ -142,17 +91,71 @@ struct _switch {
     u8_t onoff_state;
 };
 
+static void gen_onoff_get(struct bt_mesh_model *model,
+                          struct bt_mesh_msg_ctx *ctx,
+                          struct net_buf_simple *buf);
+static void gen_onoff_set(struct bt_mesh_model *model,
+                          struct bt_mesh_msg_ctx *ctx,
+                          struct net_buf_simple *buf);
+static void gen_onoff_set_unack(struct bt_mesh_model *model,
+                                struct bt_mesh_msg_ctx *ctx,
+                                struct net_buf_simple *buf);
+static void health_attention_on(struct bt_mesh_model *mod);
+static void health_attention_off(struct bt_mesh_model *mod);
+
+
 static u8_t trans_id;
+const int config_bt_mesh_features = BT_MESH_FEAT_SUPPORTED;
+static u8 ble_mesh_adv_name[32 + 2];
+const uint8_t mesh_default_name[] = {
+    // Name
+    BYTE_LEN(BLE_DEV_NAME) + 1, BLUETOOTH_DATA_TYPE_COMPLETE_LOCAL_NAME, BLE_DEV_NAME,
+};
 
 static struct onoff_state onoff_state[] = {
     { .led_gpio_pin = LED0_GPIO_PIN },
 };
 
 const u8 led_use_port[] = {
-
     IO_PORTA_01,
-
 };
+
+static const struct bt_mesh_send_cb rsp_msg_cb = {
+    // .user_intercept = respond_messsage_schedule,//for compiler, not used now.
+};
+
+static const struct bt_mesh_health_srv_cb health_srv_cb = {
+    .attn_on = health_attention_on,
+    .attn_off = health_attention_off,
+};
+
+static struct bt_mesh_health_srv health_srv = {
+    .cb = &health_srv_cb,
+};
+
+/*
+ * OnOff Model Server Op Dispatch Table
+ *
+ */
+static const struct bt_mesh_model_op gen_onoff_srv_op[] = {
+    { BT_MESH_MODEL_OP_GEN_ONOFF_GET,       BT_MESH_LEN_EXACT(0), gen_onoff_get },
+    { BT_MESH_MODEL_OP_GEN_ONOFF_SET,       BT_MESH_LEN_MIN(2), gen_onoff_set },
+    { BT_MESH_MODEL_OP_GEN_ONOFF_SET_UNACK, BT_MESH_LEN_MIN(2), gen_onoff_set_unack },
+    BT_MESH_MODEL_OP_END,
+};
+
+//-----------------------------------------------------------
+
+
+
+void get_mesh_adv_name(u8 *len, u8 **data)
+{
+    //r_printf("==============================%s,%d\n", __FUNCTION__, __LINE__);
+    //put_buf(ble_mesh_adv_name,32);
+    *len = ble_mesh_adv_name[0] + 1;
+    *data = ble_mesh_adv_name;
+
+}
 
 /*
  * Generic OnOff Model Server Message Handlers
@@ -187,19 +190,15 @@ static void respond_messsage_schedule(u16 *delay, u16 *duration, void *cb_data)
     log_info("respond_messsage delay =%u ms", delay_ms);
 }
 
-static const struct bt_mesh_send_cb rsp_msg_cb = {
-    .user_intercept = respond_messsage_schedule,
-};
-
 static void gen_onoff_get(struct bt_mesh_model *model,
                           struct bt_mesh_msg_ctx *ctx,
                           struct net_buf_simple *buf)
 {
     NET_BUF_SIMPLE_DEFINE(msg, 2 + 1 + 4);
-    struct onoff_state *onoff_state = model->user_data;
+    struct onoff_state *onoff_state = model->rt->user_data;
 
     log_info("addr 0x%04x onoff 0x%02x\n",
-             bt_mesh_model_elem(model)->addr, onoff_state->current);
+             bt_mesh_model_elem(model)->rt->addr, onoff_state->current);
     bt_mesh_model_msg_init(&msg, BT_MESH_MODEL_OP_GEN_ONOFF_STATUS);
     buffer_add_u8_at_tail(&msg, onoff_state->current);
 
@@ -213,16 +212,22 @@ static void gen_onoff_set_unack(struct bt_mesh_model *model,
                                 struct net_buf_simple *buf)
 {
     struct net_buf_simple *msg = model->pub->msg;
-    struct onoff_state *onoff_state = model->user_data;
+    struct onoff_state *onoff_state = model->rt->user_data;
     int err;
 
     onoff_state->current = buffer_pull_u8_from_head(buf);
     log_info("addr 0x%02x state 0x%02x\n",
-             bt_mesh_model_elem(model)->addr, onoff_state->current);
+             bt_mesh_model_elem(model)->rt->addr, onoff_state->current);
     /* log_info_hexdump((u8 *)onoff_state, sizeof(*onoff_state)); */
 
     gpio_pin_write(onoff_state->led_gpio_pin,
                    onoff_state->current);
+
+#if PACKET_LOSS_RATE_TEST
+    static uint32_t i = 0;
+    i++;
+    log_info(">>> recv num %d ", i);
+#endif
 
 #if 0
     /*
@@ -260,16 +265,21 @@ static void gen_onoff_set(struct bt_mesh_model *model,
     gen_onoff_get(model, ctx, buf);
 }
 
-/*
- * OnOff Model Server Op Dispatch Table
- *
- */
-static const struct bt_mesh_model_op gen_onoff_srv_op[] = {
-    { BT_MESH_MODEL_OP_GEN_ONOFF_GET, 0, gen_onoff_get },
-    { BT_MESH_MODEL_OP_GEN_ONOFF_SET, 2, gen_onoff_set },
-    { BT_MESH_MODEL_OP_GEN_ONOFF_SET_UNACK, 2, gen_onoff_set_unack },
-    BT_MESH_MODEL_OP_END,
-};
+static void health_attention_on(struct bt_mesh_model *mod)
+{
+    log_info(">>>>>>>>>>>>>>>>>health_attention_on\n");
+    for (u8 i = 0; i < sizeof(led_use_port); i++) {
+        led_blink_worker_on(led_use_port[i]);
+    }
+}
+
+static void health_attention_off(struct bt_mesh_model *mod)
+{
+    log_info(">>>>>>>>>>>>>>>>>health_attention_off\n");
+    for (u8 i = 0; i < sizeof(led_use_port); i++) {
+        led_blink_worker_off(led_use_port[i]);
+    }
+}
 
 /*
  *
@@ -278,7 +288,8 @@ static const struct bt_mesh_model_op gen_onoff_srv_op[] = {
  * Element 0 Root Models
  */
 static struct bt_mesh_model root_models[] = {
-    BT_MESH_MODEL_CFG_SRV(&cfg_srv),
+    BT_MESH_MODEL_CFG_SRV,
+    BT_MESH_MODEL_HEALTH_SRV(&health_srv, &health_pub),
     BT_MESH_MODEL(BT_MESH_MODEL_ID_GEN_ONOFF_SRV, gen_onoff_srv_op, &gen_onoff_pub_srv, &onoff_state[0]),
 };
 
@@ -286,7 +297,7 @@ static struct bt_mesh_model root_models[] = {
  * LED to Server Model Assigmnents
  */
 static struct bt_mesh_model *mod_srv_sw[] = {
-    &root_models[1],
+    &root_models[2],
 };
 
 /*
@@ -337,6 +348,7 @@ static bool server_publish(struct _switch *sw)
      * must be configured to either publish to the led's unicast
      * address or a group to which the led is subscribed.
      */
+    u16 primary_addr = get_primary_addr();
     if (primary_addr == BT_MESH_ADDR_UNASSIGNED) {
         NET_BUF_SIMPLE_DEFINE(msg, 1);
         struct bt_mesh_msg_ctx ctx = {
@@ -372,15 +384,20 @@ static void mesh_init(void)
 {
     log_info("--func=%s", __FUNCTION__);
 
+    bt_conn_cb_register(bt_conn_get_callbacks());
+
     int err = bt_mesh_init(&prov, &composition);
     if (err) {
         log_error("Initializing mesh failed (err %d)\n", err);
         return;
     }
 
-    settings_load();
+    if (IS_ENABLED(CONFIG_BT_SETTINGS)) {
+        settings_load();
+    }
 
-    bt_mesh_prov_enable(BT_MESH_PROV_GATT | BT_MESH_PROV_ADV);
+    bt_mesh_prov_enable(BT_MESH_PROV_GATT);
+
 }
 
 void input_key_handler(u8 key_status, u8 key_number)
@@ -392,7 +409,7 @@ void input_key_handler(u8 key_status, u8 key_number)
     /*Audio Test Demo*/
 #if (TCFG_AUDIO_ENABLE && MESH_AUDIO_TEST)
     if (key_status == KEY_EVENT_CLICK && key_number == TCFG_ADKEY_VALUE0) {
-        printf(">>>key0:mic/encode test\n");
+        log_info(">>>key0:mic/encode test\n");
         //AC695N/AC696N mic test
         /* extern int audio_adc_open_demo(void); */
         /* audio_adc_open_demo(); */
@@ -421,7 +438,7 @@ void input_key_handler(u8 key_status, u8 key_number)
         audio_demo_enc_open(NULL, AUDIO_CODING_USBC, 0);
     }
     if (key_status == KEY_EVENT_CLICK && key_number == TCFG_ADKEY_VALUE1) {
-        printf(">>>key1:tone/decode test\n");
+        log_info(">>>key1:tone/decode test\n");
         //AC695N/AC696N tone play test
         /* tone_play_by_path(TONE_NORMAL, 1); */
         /* tone_play_by_path(TONE_BT_CONN, 1); */
@@ -459,12 +476,14 @@ void input_key_handler(u8 key_status, u8 key_number)
         press_switch.onoff_state = 1;
         button_pressed_worker(&press_switch);
         break;
+
     case KEY_EVENT_LONG:
         log_info("  [KEY_EVENT_LONG]  ");
         press_switch.sw_num = key_number;
         press_switch.onoff_state = 0;
         button_pressed_worker(&press_switch);
         break;
+
     case KEY_EVENT_HOLD:
         log_info("  [KEY_EVENT_HOLD]  ");
         break;
@@ -474,14 +493,10 @@ void input_key_handler(u8 key_status, u8 key_number)
 #endif/*TCFG_AUDIO_ENABLE*/
 }
 
-extern void mesh_set_gap_name(const u8 *name);
 void bt_ble_init(void)
 {
     u8 bt_addr[6] = {MAC_TO_LITTLE_ENDIAN(CUR_DEVICE_MAC_ADDR)};
 
-    bt_mac_addr_set(bt_addr);
-
-    //r_printf("==============================%s,%d\n", __FUNCTION__, __LINE__);
     bt_mac_addr_set(bt_addr);
 
     u8 *name_p = &ble_mesh_adv_name[2];

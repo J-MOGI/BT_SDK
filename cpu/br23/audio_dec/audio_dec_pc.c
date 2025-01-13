@@ -10,7 +10,7 @@
 #include "audio_config.h"
 #include "system/includes.h"
 #include "audio_enc.h"
-#include "application/audio_eq_drc_apply.h"
+#include "media/audio_eq.h"
 #include "app_config.h"
 #include "audio_config.h"
 #include "audio_dec.h"
@@ -19,6 +19,7 @@
 #include "media/pcm_decoder.h"
 #include "bt_tws.h"
 #include "media/audio_stream.h"
+#include "audio_effect/effects_adj.h"
 
 #if (SOUNDCARD_ENABLE)
 #include "stream_sync.h"
@@ -28,9 +29,7 @@
 #include "ui/ui_api.h"
 #endif
 
-
 #if TCFG_APP_PC_EN
-
 //////////////////////////////////////////////////////////////////////////////
 #if ((AUDIO_OUTPUT_WAY == AUDIO_OUTPUT_WAY_DAC) &&  !TCFG_USER_TWS_ENABLE)
 #define PC_SYNC_BY_DAC_HRP      (1)
@@ -43,9 +42,9 @@ struct uac_dec_hdl {
     struct pcm_decoder pcm_dec;		// pcm解码句柄
     struct audio_res_wait wait;		// 资源等待句柄
     struct audio_mixer_ch mix_ch;	// 叠加句柄
-    struct audio_eq_drc *eq_drc;//eq drc句柄
+    struct audio_eq *eq;    //eq 句柄
 #if TCFG_EQ_DIVIDE_ENABLE
-    struct audio_eq_drc *eq_drc_rl_rr;//eq drc句柄
+    struct audio_eq *eq_rl_rr;    //eq 句柄
     struct audio_vocal_tract vocal_tract;//声道合并目标句柄
     struct audio_vocal_tract_ch synthesis_ch_fl_fr;//声道合并句柄
     struct audio_vocal_tract_ch synthesis_ch_rl_rr;//声道合并句柄
@@ -75,10 +74,7 @@ extern int usb_audio_mic_open(void *_info);
 extern int usb_audio_mic_close(void *arg);
 extern void usb_audio_mic_set_gain(int gain);
 
-void *pc_eq_drc_open(u16 sample_rate, u8 ch_num);
-void pc_eq_drc_close(struct audio_eq_drc *eq_drc);
-void *pc_rl_rr_eq_drc_open(u16 sample_rate, u8 ch_num);
-void pc_rl_rr_eq_drc_close(struct audio_eq_drc *eq_drc);
+
 
 //////////////////////////////////////////////////////////////////////////////
 
@@ -191,9 +187,12 @@ static int uac_audio_close(void)
         sys_hi_timer_del(uac_dec->check_data_timer);
     }
     pcm_decoder_close(&uac_dec->pcm_dec);
-    pc_eq_drc_close(uac_dec->eq_drc);
+#if TCFG_EQ_ENABLE && TCFG_PC_MODE_EQ_ENABLE
+    music_eq_close(uac_dec->eq);
+#endif
 #if TCFG_EQ_DIVIDE_ENABLE
-    pc_rl_rr_eq_drc_close(uac_dec->eq_drc_rl_rr);
+    music_eq_rl_rr_close(uac_dec->eq_rl_rr);
+
     audio_vocal_tract_synthesis_close(&uac_dec->synthesis_ch_fl_fr);
     audio_vocal_tract_synthesis_close(&uac_dec->synthesis_ch_rl_rr);
     audio_vocal_tract_close(&uac_dec->vocal_tract);
@@ -219,7 +218,12 @@ static int uac_audio_close(void)
         audio_stream_close(uac_dec->stream);
         uac_dec->stream = NULL;
     }
-
+#if TCFG_EQ_DIVIDE_ENABLE
+    if (uac_dec->vocal_tract.stream) {
+        audio_stream_close(uac_dec->vocal_tract.stream);
+        uac_dec->vocal_tract.stream = NULL;
+    }
+#endif
     clock_set_cur();
     return 0;
 }
@@ -514,10 +518,12 @@ static int uac_audio_start(void)
 #endif
 
     /* audio_mixer_ch_set_no_wait(&dec->mix_ch, 1, 10); // 超时自动丢数 */
-    dec->eq_drc = pc_eq_drc_open(dec->pcm_dec.sample_rate, dec->pcm_dec.output_ch_num);
+#if TCFG_EQ_ENABLE && TCFG_PC_MODE_EQ_ENABLE
+    dec->eq = music_eq_open(dec->pcm_dec.sample_rate, dec->pcm_dec.output_ch_num);// eq
+#endif
 #if TCFG_EQ_DIVIDE_ENABLE
-    dec->eq_drc_rl_rr = pc_rl_rr_eq_drc_open(dec->pcm_dec.sample_rate, dec->pcm_dec.output_ch_num);
-    if (dec->eq_drc_rl_rr) {
+    dec->eq_rl_rr = music_eq_rl_rr_open(dec->pcm_dec.sample_rate, dec->pcm_dec.output_ch_num);// eq
+    if (dec->eq_rl_rr) {
         audio_vocal_tract_open(&dec->vocal_tract, AUDIO_SYNTHESIS_LEN);
         {
             u8 entry_cnt = 0;
@@ -544,10 +550,12 @@ static int uac_audio_start(void)
     // 数据流串联
     struct audio_stream_entry *entries[8] = {NULL};
     u8 entry_cnt = 0;
+    u8 rl_rr_entry_start = 0;
     entries[entry_cnt++] = &dec->pcm_dec.decoder.entry;
+    rl_rr_entry_start = entry_cnt - 1;//记录eq的上一个节点
 #if TCFG_EQ_ENABLE && TCFG_PC_MODE_EQ_ENABLE
-    if (dec->eq_drc) {
-        entries[entry_cnt++] = &dec->eq_drc->entry;
+    if (dec->eq) {
+        entries[entry_cnt++] = &dec->eq->entry;
     }
 #endif
 #if SYS_DIGVOL_GROUP_EN
@@ -557,7 +565,7 @@ static int uac_audio_start(void)
 
 
 #if TCFG_EQ_DIVIDE_ENABLE
-    if (dec->eq_drc_rl_rr) {
+    if (dec->eq_rl_rr) {
         entries[entry_cnt++] = &dec->synthesis_ch_fl_fr.entry;//四声道eq独立时，该节点后不接节点
     } else {
         if (dec->ch_switch) {
@@ -571,11 +579,21 @@ static int uac_audio_start(void)
 
     // 创建数据流，把所有节点连接起来
     dec->stream = audio_stream_open(dec, uac_dec_out_stream_resume);
+    if (!dec->stream) {
+        goto __err3;
+    }
     audio_stream_add_list(dec->stream, entries, entry_cnt);
 #if TCFG_EQ_DIVIDE_ENABLE
-    if (dec->eq_drc_rl_rr) { //接在eq_drc的上一个节点
-        audio_stream_add_entry(entries[0], &dec->eq_drc_rl_rr->entry);
-        audio_stream_add_entry(&dec->eq_drc_rl_rr->entry, &dec->synthesis_ch_rl_rr.entry);
+    struct audio_stream_entry *rl_rr_entries[16] = {NULL};
+    entry_cnt = 0;
+    if (dec->eq_rl_rr) { //接在eq的上一个节点
+        rl_rr_entries[entry_cnt++] = entries[rl_rr_entry_start];
+        rl_rr_entries[entry_cnt++] = &dec->eq_rl_rr->entry;
+
+        rl_rr_entries[entry_cnt++] = &dec->synthesis_ch_rl_rr.entry;//必须是最后一个
+        for (int i = 0; i < (entry_cnt - 1); i++) {
+            audio_stream_add_entry(rl_rr_entries[i], rl_rr_entries[i + 1]);
+        }
     }
 #endif
 
@@ -616,9 +634,11 @@ static int uac_audio_start(void)
 
 __err3:
     dec->start = 0;
-    pc_eq_drc_close(dec->eq_drc);
+#if TCFG_EQ_ENABLE && TCFG_PC_MODE_EQ_ENABLE
+    music_eq_close(dec->eq);
+#endif
 #if TCFG_EQ_DIVIDE_ENABLE
-    pc_rl_rr_eq_drc_close(dec->eq_drc_rl_rr);
+    music_eq_rl_rr_close(dec->eq_rl_rr);
     audio_vocal_tract_synthesis_close(&dec->synthesis_ch_fl_fr);
     audio_vocal_tract_synthesis_close(&dec->synthesis_ch_rl_rr);
     audio_vocal_tract_close(&dec->vocal_tract);
@@ -640,6 +660,12 @@ __err3:
         audio_stream_close(dec->stream);
         dec->stream = NULL;
     }
+#if TCFG_EQ_DIVIDE_ENABLE
+    if (dec->vocal_tract.stream) {
+        audio_stream_close(dec->vocal_tract.stream);
+        dec->vocal_tract.stream = NULL;
+    }
+#endif
 
     pcm_decoder_close(&dec->pcm_dec);
 __err1:
@@ -955,81 +981,6 @@ void usb_audio_demo_exit(void)
     usb_audio_play_close(NULL);
     usb_audio_mic_close(NULL);
 }
-/*----------------------------------------------------------------------------*/
-/**@brief    pc模式 eq drc 打开
-   @param    sample_rate:采样率
-   @param    ch_num:通道个数
-   @return   句柄
-   @note
-*/
-/*----------------------------------------------------------------------------*/
-void *pc_eq_drc_open(u16 sample_rate, u8 ch_num)
-{
-#if TCFG_EQ_ENABLE && TCFG_PC_MODE_EQ_ENABLE
-    struct audio_eq_drc *eq_drc = NULL;
-    u8 drc_en = 0;
-#if TCFG_DRC_ENABLE && TCFG_PC_MODE_DRC_ENABLE
-    drc_en = 1;
-#endif/*TCFG_DRC_ENABLE && TCFG_LINEIN_MODE_DRC_ENABLE*/
-    eq_drc = stream_eq_drc_open_demo(sample_rate, ch_num, drc_en, song_eq_mode);
-
-    return eq_drc;
-#endif/*TCFG_EQ_ENABLE && TCFG_PC_MODE_EQ_ENABLE*/
-    return NULL;
-}
-
-/*----------------------------------------------------------------------------*/
-/**@brief    pc模式 eq drc 关闭
-   @param    句柄
-   @return
-   @note
-*/
-/*----------------------------------------------------------------------------*/
-void pc_eq_drc_close(struct audio_eq_drc *eq_drc)
-{
-#if TCFG_EQ_ENABLE && TCFG_PC_MODE_EQ_ENABLE
-    stream_eq_drc_close_demo(eq_drc);
-#endif/*TCFG_EQ_ENABLE && TCFG_PC_MODE_EQ_ENABLE*/
-}
-
-/*----------------------------------------------------------------------------*/
-/**@brief    linein模式 RL RR 通道eq drc 打开
-   @param    sample_rate:采样率
-   @param    ch_num:通道个数
-   @return   句柄
-   @note
-*/
-/*----------------------------------------------------------------------------*/
-
-void *pc_rl_rr_eq_drc_open(u16 sample_rate, u8 ch_num)
-{
-#if TCFG_EQ_ENABLE && TCFG_PC_MODE_EQ_ENABLE
-    struct audio_eq_drc *eq_drc = NULL;
-    u8 drc_en = 0;
-#if TCFG_DRC_ENABLE && TCFG_PC_MODE_DRC_ENABLE
-    drc_en = 1;
-#endif/*TCFG_DRC_ENABLE && TCFG_LINEIN_MODE_DRC_ENABLE*/
-    eq_drc = stream_eq_drc_open_demo(sample_rate, ch_num, drc_en, rl_eq_mode);
-
-    return eq_drc;
-#endif/*TCFG_EQ_ENABLE && TCFG_PC_MODE_EQ_ENABLE*/
-    return NULL;
-}
-
-/*----------------------------------------------------------------------------*/
-/**@brief    pc模式 RL RR 通道eq drc 关闭
-   @param    句柄
-   @return
-   @note
-*/
-/*----------------------------------------------------------------------------*/
-void pc_rl_rr_eq_drc_close(struct audio_eq_drc *eq_drc)
-{
-#if TCFG_EQ_ENABLE && TCFG_PC_MODE_EQ_ENABLE
-    stream_eq_drc_close_demo(eq_drc);
-#endif/*TCFG_EQ_ENABLE && TCFG_PC_MODE_EQ_ENABLE*/
-}
-
 
 #endif /* TCFG_APP_PC_EN */
 

@@ -119,8 +119,8 @@ DEFINES := \
 	-DCONFIG_EVENT_KEY_MAP_ENABLE=0 \
 	-DTIMER_POOL_NUM_CONFIG=10 \
 	-DAPP_ASYNC_POOL_NUM_CONFIG=0 \
-	-DSDK_VERSION_CFG_DEFINE=0x230003 \
-	-DSDK_VERSION_DATE_DEFINE=20240331 \
+	-DSDK_VERSION_CFG_DEFINE=0x240001 \
+	-DSDK_VERSION_DATE_DEFINE=20241231 \
 	-DVFS_ENABLE=1 \
 	-DUSE_SDFILE_NEW=1 \
 	-DVFS_FILE_POOL_NUM_CONFIG=0 \
@@ -379,6 +379,8 @@ c_SRC_FILES := \
 	../../../../apps/spp_and_le/examples/findmy/ble_fmy_fmna.c \
 	../../../../apps/spp_and_le/examples/findmy/ble_fmy_ota.c \
 	../../../../apps/spp_and_le/examples/findmy/ble_fmy_sensor_uart.c \
+	../../../../apps/spp_and_le/examples/ftms/app_ftms.c \
+	../../../../apps/spp_and_le/examples/ftms/ble_ftms.c \
 	../../../../apps/spp_and_le/examples/hilink/app_hilink.c \
 	../../../../apps/spp_and_le/examples/hilink/hilink_demo.c \
 	../../../../apps/spp_and_le/examples/idle/app_idle.c \
@@ -407,6 +409,7 @@ c_SRC_FILES := \
 	../../../../apps/spp_and_le/modules/power/app_power_manage.c \
 	../../../../apps/spp_and_le/modules/rtc_alarm.c \
 	../../../../apps/spp_and_le/modules/user_cfg.c \
+	../../../../apps/spp_and_le/modules/virtual_rtc_demo.c \
 	../../../../apps/spp_and_le/version.c \
 	../../../../cpu/br23/adc_api.c \
 	../../../../cpu/br23/audio_common/app_audio.c \
@@ -419,6 +422,8 @@ c_SRC_FILES := \
 	../../../../cpu/br23/audio_dec/tone_player.c \
 	../../../../cpu/br23/audio_demo/audio_dac_io_demo.c \
 	../../../../cpu/br23/audio_demo/audio_fft_demo.c \
+	../../../../cpu/br23/audio_effect/audio_eq_drc_demo.c \
+	../../../../cpu/br23/audio_effect/eq_config.c \
 	../../../../cpu/br23/audio_enc/audio_adc_demo.c \
 	../../../../cpu/br23/audio_enc/audio_enc.c \
 	../../../../cpu/br23/audio_enc/audio_mic_codec.c \
@@ -498,6 +503,8 @@ LFLAGS := \
 	../../../../cpu/br23/liba/fmna_stack.a \
 	../../../../cpu/br23/liba/fmna_auth.a \
 	../../../../cpu/br23/liba/MotionDetection.a \
+	../../../../cpu/br23/liba/lib_resample_cal.a \
+	../../../../cpu/br23/liba/lib_resample_fast_cal.a \
 	../../../../cpu/br23/liba/media.a \
 	../../../../cpu/br23/liba/media_app.a \
 	../../../../cpu/br23/liba/opus_enc_lib.a \
@@ -507,6 +514,7 @@ LFLAGS := \
 	../../../../cpu/br23/liba/wav_dec_lib.a \
 	../../../../cpu/br23/liba/wtgv2_dec_lib.a \
 	../../../../cpu/br23/liba/mp3_dec_lib.a \
+	../../../../cpu/br23/liba/lib_pitch_speed.a \
 	../../../../apps/common/third_party_profile/tuya_protocol/sdk/lib/libtuya_lib.a \
 	../../../../cpu/br23/liba/lib_midi_dec.a \
 	../../../../cpu/br23/liba/update.a \

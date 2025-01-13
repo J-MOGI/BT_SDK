@@ -239,7 +239,7 @@ static bool __resolve_ext_adv_report(le_ext_adv_report_evt_t *evt, u16 len)
         case HCI_EIR_DATATYPE_SHORTENED_LOCAL_NAME:
             tmp32 = adv_data_pt[lenght - 1];
             adv_data_pt[lenght - 1] = 0;;
-            log_info("ble remoter_name: %s,rssi:%d\n", adv_data_pt, evt->RSSI);
+            log_info("ble remoter_name: %s,rssi:%d\n", adv_data_pt, (s8)evt->RSSI);
             log_info_hexdump(evt->Address, 6);
             adv_data_pt[lenght - 1] = tmp32;
 

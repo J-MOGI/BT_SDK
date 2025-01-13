@@ -7,8 +7,9 @@ copy ..\..\cfg_tool.bin .
 copy ..\..\app.bin .
 copy ..\..\bd29loader.bin .
 copy ..\..\script.ver .
+copy ..\..\flash_params.bin
 
-..\..\isd_download.exe ..\..\isd_config.ini -tonorflash -dev bd29 -boot 0x2000 -div8 -wait 300 -uboot ..\..\uboot.boot -app ..\..\app.bin ..\..\cfg_tool.bin -uboot_compress
+..\..\isd_download.exe ..\..\isd_config.ini -tonorflash -dev bd29 -boot 0x2000 -div8 -wait 300 -uboot ..\..\uboot.boot -app ..\..\app.bin ..\..\cfg_tool.bin -uboot_compress -flash-params flash_params.bin
 :: -format all
 ::-reboot 2500
 

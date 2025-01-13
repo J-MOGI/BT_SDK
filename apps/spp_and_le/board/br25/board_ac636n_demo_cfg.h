@@ -209,6 +209,9 @@
 #define TCFG_ENC_SPEEX_ENABLE              	DISABLE
 #define TCFG_DEC_WAV_ENABLE					DISABLE
 #define TCFG_DEC_MP3_ENABLE					DISABLE
+
+#define TCFG_SPEED_PITCH_ENABLE            	DISABLE    //提示音变调功能
+#define TCFG_SPEED_MODE           		   	(1.0f)    //倍速配置,(如二倍速就是(2.0f))
 #else
 #define TCFG_DEC_PCM_CLOSE
 #define TCFG_DEC_SBC_CLOSE

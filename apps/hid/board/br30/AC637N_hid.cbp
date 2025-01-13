@@ -54,8 +54,8 @@
 <Add option="-DCONFIG_EVENT_KEY_MAP_ENABLE=0" />
 <Add option="-DTIMER_POOL_NUM_CONFIG=10" />
 <Add option="-DAPP_ASYNC_POOL_NUM_CONFIG=0" />
-<Add option="-DSDK_VERSION_CFG_DEFINE=0x230003" />
-<Add option="-DSDK_VERSION_DATE_DEFINE=20240331" />
+<Add option="-DSDK_VERSION_CFG_DEFINE=0x240001" />
+<Add option="-DSDK_VERSION_DATE_DEFINE=20241231" />
 <Add option="-DVFS_ENABLE=1" />
 <Add option="-DUSE_SDFILE_NEW=1" />
 <Add option="-DVFS_FILE_POOL_NUM_CONFIG=0" />

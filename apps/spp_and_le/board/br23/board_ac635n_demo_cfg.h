@@ -102,7 +102,7 @@
 //                                  RTC_ALARM配置                                  //
 //*********************************************************************************//
 #define TCFG_RTC_ALARM_ENABLE               DISABLE_THIS_MOUDLE
-
+#define TCFG_USE_VIRTUAL_RTC                ENABLE_THIS_MOUDLE
 //*********************************************************************************//
 //                                 key 配置                                        //
 //*********************************************************************************//
@@ -263,6 +263,9 @@
 #define TCFG_DEC_WAV_ENABLE					DISABLE
 #define TCFG_DEC_MIDI_ENABLE			    DISABLE//midi文件播放
 #define TCFG_DEC_MP3_ENABLE					DISABLE
+
+#define TCFG_SPEED_PITCH_ENABLE            	DISABLE    //提示音变调功能
+#define TCFG_SPEED_MODE           		   	(1.0f)    //倍速配置,(如二倍速就是(2.0f))
 #else
 #define TCFG_DEC_PCM_ENABLE					DISABLE
 #endif/*TCFG_AUDIO_ENABLE*/
@@ -416,17 +419,10 @@ DAC硬件上的连接方式,可选的配置：
 //*********************************************************************************//
 //                                  EQ配置                                         //
 //*********************************************************************************//
-//EQ配置，使用在线EQ时，EQ文件和EQ模式无效。有EQ文件时，默认不用EQ模式切换功能
-#define TCFG_EQ_ENABLE                            0     //支持EQ功能
-#define TCFG_EQ_ONLINE_ENABLE                     0     //支持在线EQ调试
-#define TCFG_BT_MUSIC_EQ_ENABLE                   0     //支持蓝牙音乐EQ
-#define TCFG_PHONE_EQ_ENABLE                      0     //支持通话近端EQ
+#define TCFG_EQ_ENABLE                            1     //支持EQ功能
+#define TCFG_PC_MODE_EQ_ENABLE                    1     //pc播歌eq使能
+#define EQ_SECTION_MAX                            (10)  //支持的eq段数
 
-
-// ONLINE CCONFIG
-#define TCFG_ONLINE_ENABLE                        (TCFG_EQ_ONLINE_ENABLE)    //是否支持EQ在线调试功能
-#define TCFG_ONLINE_TX_PORT						  IO_PORT_DP                 //EQ调试TX口选择
-#define TCFG_ONLINE_RX_PORT						  IO_PORT_DM                 //EQ调试RX口选择
 
 
 //*********************************************************************************//

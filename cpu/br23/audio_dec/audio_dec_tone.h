@@ -9,6 +9,7 @@
 #include "system/includes.h"
 #include "media/audio_decoder.h"
 #include "application/audio_dec_app.h"
+#include "application/audio_pitchspeed.h"
 #include "tone_player.h"
 
 #define TONE_DEC_REPEAT_EN				0 // 无缝循环播放
@@ -71,6 +72,9 @@ struct tone_dec_handle {
     u8 repeat_num;			// 无缝循环次数
     struct fixphase_repair_obj repair_buf;	// 无缝循环句柄
 #endif /* #if TONE_DEC_REPEAT_EN */
+#if TCFG_SPEED_PITCH_ENABLE
+    s_pitchspeed_hdl *p_pitchspeed_hdl; // 变速变调句柄
+#endif
 };
 
 /*----------------------------------------------------------------------------*/

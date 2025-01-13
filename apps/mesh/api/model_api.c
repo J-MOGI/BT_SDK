@@ -12,25 +12,11 @@
 #define LOG_CLI_ENABLE
 #include "debug.h"
 
-#define APPS_VM_START_INDEX                     19
 
-//< max index : 128
-typedef enum _INFO_SETTING_INDEX {
-
-    MAC_ADDR_INDEX = APPS_VM_START_INDEX,
-
-    VM_INDEX_DEMO_0,
-    VM_INDEX_DEMO_1,
-
-    // ...more to add
-} INFO_SETTING_INDEX;
-
-
-u16_t primary_addr;
+static u16_t primary_addr;
 static u16_t primary_net_idx;
+static u32_t led_blink_timer;
 
-extern void pseudo_random_genrate(uint8_t *dest, unsigned size);
-extern uint32_t btctler_get_rand_from_assign_range(uint32_t rand, uint32_t min, uint32_t max);
 extern char *bd_addr_to_str(u8 addr[6]);
 extern const u8 led_use_port[2];
 
@@ -40,6 +26,11 @@ void prov_complete(u16_t net_idx, u16_t addr)
              net_idx, addr);
     primary_addr = addr;
     primary_net_idx = net_idx;
+}
+
+u16_t get_primary_addr(void)
+{
+    return primary_addr;
 }
 
 void prov_reset(void)
@@ -61,7 +52,7 @@ static void relay_sent(u16 *delay, u16 *duration, void *cb_data)
 }
 
 const struct bt_mesh_send_cb relay_sent_cb = {
-    .user_intercept = relay_sent,
+    // .user_intercept = relay_sent,//for compiler, not used now.
 };
 
 void gpio_pin_write(u8_t led_index, u8_t onoff)
@@ -74,33 +65,30 @@ void gpio_pin_write(u8_t led_index, u8_t onoff)
     onoff ? gpio_direction_output(led_use_port[led_index], 1) : gpio_direction_output(led_use_port[led_index], 0);
 }
 
-static bool info_load(INFO_SETTING_INDEX index, void *buf, u16 len)
+void toggle_led(void *gpio)
 {
-    int ret;
-
-    log_info("syscfg id = 0x%x", index);
-    ret = syscfg_read(index, (u8 *)buf, len);
-    log_info("ret = %d\n", ret);
-    if (ret != len) {
-        log_info("syscfg_read err\n");
-        log_info("ret = %d\n", ret);
-        return 1;
-    }
-
-    return 0;
+    static u8 led_state = 0;
+    gpio_direction_output((u32)gpio, led_state);
+    led_state = !led_state;
 }
 
-static void info_store(INFO_SETTING_INDEX index, void *buf, u16 len)
+void led_blink_worker_on(u32 gpio)
 {
-    int ret;
-
-    log_info("syscfg id = 0x%x", index);
-    ret = syscfg_write(index, (u8 *)buf, len);
-
-    if (ret != len) {
-        log_info("syscfg_write err\n");
-        log_info("ret = %d\n", ret);
+    printf("led_blink_worker_on");
+    if (led_blink_timer) {
+        sys_timer_del(led_blink_timer);
     }
+    led_blink_timer = sys_timer_add((void *)gpio, toggle_led, 100);
+}
+
+void led_blink_worker_off(u32 gpio)
+{
+    printf("led_blink_worker_off");
+    if (led_blink_timer) {
+        sys_timer_del(led_blink_timer);
+        led_blink_timer = 0;
+    }
+    gpio_set_direction(gpio, 1);
 }
 
 static void generate_bt_address(u8 addr[6])
@@ -116,23 +104,16 @@ static void generate_bt_address(u8 addr[6])
 void bt_mac_addr_set(u8 *bt_addr)
 {
     int err;
+    u8 mac_addr[6];
 
     if (!bt_addr) {
-        u8 mac_addr[6];
-        bt_addr = mac_addr;
-        err = info_load(MAC_ADDR_INDEX, bt_addr, sizeof(bt_addr));
-        if (err) {
-            log_info(RedBoldBlink "first setup bt mac addr store" Reset);
-            generate_bt_address(bt_addr);
-            info_store(MAC_ADDR_INDEX, bt_addr, sizeof(bt_addr));
-        } else {
-            log_info(BlueBoldBlink "load exist bt mac addr" Reset);
-        }
+        memcpy(mac_addr, (void *)bt_get_mac_addr(), 6);
+        le_controller_set_mac((void *)mac_addr);
+        log_info("bt MAC from flash: %s", bd_addr_to_str(mac_addr));
+    } else {
+        le_controller_set_mac(bt_addr);
+        log_info("bt MAC from default: %s", bd_addr_to_str(bt_addr));
     }
-
-    le_controller_set_mac(bt_addr);
-
-    log_info(PurpleBold "CHIP bt MAC : %s" Reset, bd_addr_to_str(bt_addr));
 }
 
 void bt_ble_adv_enable(u8 enable)

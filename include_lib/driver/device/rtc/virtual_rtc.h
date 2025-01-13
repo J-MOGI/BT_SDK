@@ -4,6 +4,7 @@
 #include "system/includes.h"
 #include "system/sys_time.h"
 #include "system/syscfg_id.h"
+#include "asm/power/p33.h"
 
 
 void vir_rtc_simulate_dump();

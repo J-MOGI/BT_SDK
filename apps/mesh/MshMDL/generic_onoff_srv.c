@@ -12,7 +12,7 @@
 #define LOG_CLI_ENABLE
 #include "debug.h"
 
-#if (CONFIG_MESH_MODEL == SIG_MESH_LIGHT_LIGHTNESS_SERVER)
+#if (CONFIG_BT_MESH_GEN_ONOFF_SRV)
 
 extern uint32_t btctler_get_rand_from_assign_range(uint32_t rand, uint32_t min, uint32_t max);
 extern void pseudo_random_genrate(uint8_t *dest, unsigned size);
@@ -55,7 +55,7 @@ struct onoff_state dev_onoff_state[] = {
 };
 
 const u8 led_use_port[] = {
-    IO_PORTB_07,
+    IO_PORTA_01,
 };
 
 /*
@@ -92,7 +92,7 @@ static void respond_messsage_schedule(u16 *delay, u16 *duration, void *cb_data)
 }
 
 static const struct bt_mesh_send_cb rsp_msg_cb = {
-    .user_intercept = respond_messsage_schedule,
+    // .user_intercept = respond_messsage_schedule,
 };
 
 static void gen_onoff_get(struct bt_mesh_model *model,
@@ -100,10 +100,10 @@ static void gen_onoff_get(struct bt_mesh_model *model,
                           struct net_buf_simple *buf)
 {
     NET_BUF_SIMPLE_DEFINE(msg, 2 + 1 + 4);
-    struct onoff_state *onoff_state = model->user_data;
+    struct onoff_state *onoff_state = model->rt->user_data;
 
     log_info("addr 0x%04x onoff 0x%02x\n",
-             bt_mesh_model_elem(model)->addr, onoff_state->current);
+             bt_mesh_model_elem(model)->rt->addr, onoff_state->current);
     bt_mesh_model_msg_init(&msg, BT_MESH_MODEL_OP_GEN_ONOFF_STATUS);
     buffer_add_u8_at_tail(&msg, onoff_state->current);
 
@@ -117,12 +117,12 @@ static void gen_onoff_set_unack(struct bt_mesh_model *model,
                                 struct net_buf_simple *buf)
 {
     struct net_buf_simple *msg = model->pub->msg;
-    struct onoff_state *onoff_state = model->user_data;
+    struct onoff_state *onoff_state = model->rt->user_data;
     int err;
 
     onoff_state->current = buffer_pull_u8_from_head(buf);
     log_info("addr 0x%02x state 0x%02x\n",
-             bt_mesh_model_elem(model)->addr, onoff_state->current);
+             bt_mesh_model_elem(model)->rt->addr, onoff_state->current);
     /* log_info_hexdump((u8 *)onoff_state, sizeof(*onoff_state)); */
 
     gpio_pin_write(onoff_state->led_gpio_pin,

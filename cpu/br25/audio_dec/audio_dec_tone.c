@@ -19,6 +19,7 @@
 extern struct audio_dac_hdl dac_hdl;
 extern struct audio_dac_channel default_dac;
 extern const int audio_dec_app_mix_en;
+extern const int config_mp3_start_silence_drop;
 
 //////////////////////////////////////////////////////////////////////////////
 extern int audio_dec_file_app_init_ok(struct audio_dec_file_app_hdl *file_dec);
@@ -30,6 +31,20 @@ static int tone_dec_list_play(struct tone_dec_handle *dec, u8 next);
 
 //////////////////////////////////////////////////////////////////////////////
 
+#if TCFG_SPEED_PITCH_ENABLE
+static int get_speedV(float speed)
+{
+    int speedV;
+    if (speed >= 1) {
+        //变快
+        speedV = (256 - 256 / speed) * 80 / 140 + 80;
+    } else {
+        //变慢
+        speedV = 80 - (256 / speed - 256) * 80 / 450;
+    }
+    return speedV;
+}
+#endif
 #if TONE_DEC_REPEAT_EN
 /*----------------------------------------------------------------------------*/
 /**@brief    循环播放回调接口
@@ -401,6 +416,13 @@ static int tone_dec_file_app_evt_cb(void *priv, enum audio_dec_app_event event, 
         sys_digvol_group_ch_close("tone_tone");
 #endif // SYS_DIGVOL_GROUP_EN
 
+#if TCFG_SPEED_PITCH_ENABLE
+        if (dec->cur_list->stream_handler == NULL) {
+            if (dec->p_pitchspeed_hdl) {
+                close_pitchspeed(dec->p_pitchspeed_hdl);
+            }
+        }
+#endif
 
         break;
     case AUDIO_DEC_APP_EVENT_START_OK:
@@ -431,6 +453,19 @@ static int tone_dec_file_app_evt_cb(void *priv, enum audio_dec_app_event event, 
             (entries_hdl->entries_addr)[entries_hdl->entries_cnt++] = dvol_entry;
         }
 #endif // SYS_DIGVOL_GROUP_EN
+#if TCFG_SPEED_PITCH_ENABLE
+        static	PS69_CONTEXT_CONF pitch_param;
+        pitch_param.pitchV = 32768;//32767 是原始音调  >32768是音调变高，《32768 音调变低，建议范围20000 - 50000
+        pitch_param.speedV = get_speedV(TCFG_SPEED_MODE);//>80变快,<80 变慢，建议范围30-130
+        pitch_param.sr = file_dec->dec->sample_rate;
+        pitch_param.chn = file_dec->dec->ch_num;
+        if (dec->cur_list->stream_handler == NULL) {
+            dec->p_pitchspeed_hdl = open_pitchspeed(&pitch_param, NULL);
+            if (dec->p_pitchspeed_hdl) {
+                (entries_hdl->entries_addr)[entries_hdl->entries_cnt++] = &dec->p_pitchspeed_hdl->entry;
+            }
+        }
+#endif
 
         break;
     case AUDIO_DEC_APP_EVENT_STREAM_CLOSE:
@@ -497,6 +532,13 @@ static int tone_dec_sine_app_evt_cb(void *priv, enum audio_dec_app_event event, 
         sys_digvol_group_ch_close("tone_tone");
 #endif // SYS_DIGVOL_GROUP_EN
 
+#if TCFG_SPEED_PITCH_ENABLE
+        if (dec->cur_list->stream_handler == NULL) {
+            if (dec->p_pitchspeed_hdl) {
+                close_pitchspeed(dec->p_pitchspeed_hdl);
+            }
+        }
+#endif
 
         break;
     case AUDIO_DEC_APP_EVENT_START_OK:
@@ -529,6 +571,19 @@ static int tone_dec_sine_app_evt_cb(void *priv, enum audio_dec_app_event event, 
         }
 #endif // SYS_DIGVOL_GROUP_EN
 
+#if TCFG_SPEED_PITCH_ENABLE
+        static	PS69_CONTEXT_CONF pitch_param;
+        pitch_param.pitchV = 32768;//32767 是原始音调  >32768是音调变高，《32768 音调变低，建议范围20000 - 50000
+        pitch_param.speedV = get_speedV(TCFG_SPEED_MODE);//>80变快,<80 变慢，建议范围30-130
+        pitch_param.sr = sine_dec->dec->sample_rate;
+        pitch_param.chn = sine_dec->dec->ch_num;
+        if (dec->cur_list->stream_handler == NULL) {
+            dec->p_pitchspeed_hdl = open_pitchspeed(&pitch_param, NULL);
+            if (dec->p_pitchspeed_hdl) {
+                (entries_hdl->entries_addr)[entries_hdl->entries_cnt++] = &dec->p_pitchspeed_hdl->entry;
+            }
+        }
+#endif
 
         break;
     case AUDIO_DEC_APP_EVENT_STREAM_CLOSE:
@@ -675,6 +730,12 @@ static int tone_dec_list_play(struct tone_dec_handle *dec, u8 next)
     dec->dec_file->dec->evt_cb = tone_dec_file_app_evt_cb;
     dec->dec_file->priv = dec;
     audio_dec_file_app_open(dec->dec_file);
+    if (config_mp3_start_silence_drop) {
+        if (ASCII_StrCmpNoCase(format, "mp3", 3) == 0) {
+            u16 start_silence_drop_threshold = 1000;
+            audio_decoder_ioctrl(&dec->dec_file->dec->decoder, AUDIO_IOCTRL_CMD_START_SILENCT_DROP, &start_silence_drop_threshold);
+        }
+    }
     return true;
 }
 

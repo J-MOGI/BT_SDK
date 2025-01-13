@@ -30,7 +30,7 @@ cp br30_ota_debug.bin ota_debug.bin
 
 /opt/utils/strip-ini -i isd_config.ini -o isd_config.ini
 
-files="app.bin br30loader.bin br30loader.uart uboot.boot uboot.boot_debug uboot_no_ota.boot uboot_no_ota.boot_debug p11_code.bin ota.bin ota_debug.bin isd_config.ini isd_download.exe fw_add.exe ufw_maker.exe"
+files="app.bin br30loader.bin br30loader.uart uboot.boot uboot.boot_debug uboot_no_ota.boot uboot_no_ota.boot_debug p11_code.bin ota.bin ota_debug.bin isd_config.ini flash_params.bin"
 
 
 host-client -project ${NICKNAME}$2 -f ${files} $1.elf

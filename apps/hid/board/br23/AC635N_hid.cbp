@@ -49,8 +49,8 @@
 <Add option="-DCONFIG_EVENT_KEY_MAP_ENABLE=0" />
 <Add option="-DTIMER_POOL_NUM_CONFIG=10" />
 <Add option="-DAPP_ASYNC_POOL_NUM_CONFIG=0" />
-<Add option="-DSDK_VERSION_CFG_DEFINE=0x230003" />
-<Add option="-DSDK_VERSION_DATE_DEFINE=20240331" />
+<Add option="-DSDK_VERSION_CFG_DEFINE=0x240001" />
+<Add option="-DSDK_VERSION_DATE_DEFINE=20241231" />
 <Add option="-DVFS_ENABLE=1" />
 <Add option="-DUSE_SDFILE_NEW=1" />
 <Add option="-DVFS_FILE_POOL_NUM_CONFIG=0" />
@@ -166,6 +166,7 @@
 <Add option="../../../../cpu/br23/liba/wtgv2_dec_lib.a" />
 <Add option="../../../../cpu/br23/liba/wav_dec_lib.a " />
 <Add option="../../../../cpu/br23/liba/mp3_dec_lib.a" />
+<Add option="../../../../cpu/br23/liba/lib_pitch_speed.a" />
 <Add option="../../../../cpu/br23/liba/lib_dns.a" />
 <Add option="../../../../cpu/br23/liba/lib_midi_dec.a" />
 <Add option="../../../../cpu/br23/liba/update.a" />
@@ -374,6 +375,7 @@
 <Unit filename="../../../../cpu/br23/audio_demo/audio_fft_demo.c"><Option compilerVer="CC"/></Unit>
 <Unit filename="../../../../cpu/br23/audio_effect/audio_eq_drc_demo.h" />
 <Unit filename="../../../../cpu/br23/audio_effect/audio_sound_track_2_p_x.h" />
+<Unit filename="../../../../cpu/br23/audio_effect/effects_adj.h" />
 <Unit filename="../../../../cpu/br23/audio_enc/audio_adc_demo.c"><Option compilerVer="CC"/></Unit>
 <Unit filename="../../../../cpu/br23/audio_enc/audio_enc.c"><Option compilerVer="CC"/></Unit>
 <Unit filename="../../../../cpu/br23/audio_enc/audio_enc.h" />
@@ -489,7 +491,9 @@
 <Unit filename="../../../../include_lib/driver/device/usb/otg.h" />
 <Unit filename="../../../../include_lib/driver/device/usb/scsi.h" />
 <Unit filename="../../../../include_lib/driver/device/usb/usb_phy.h" />
+<Unit filename="../../../../include_lib/media/audio_eq.h" />
 <Unit filename="../../../../include_lib/media/audio_stream.h" />
+<Unit filename="../../../../include_lib/media/eq_func_define.h" />
 <Unit filename="../../../../include_lib/media/localtws_decoder.h" />
 <Unit filename="../../../../include_lib/media/media_develop/media/MIDI_CTRL_API.h" />
 <Unit filename="../../../../include_lib/media/media_develop/media/MIDI_DEC_API.h" />
@@ -555,6 +559,8 @@
 <Unit filename="../../../../include_lib/system/app_core.h" />
 <Unit filename="../../../../include_lib/system/app_msg.h" />
 <Unit filename="../../../../include_lib/system/bank_switch.h" />
+<Unit filename="../../../../include_lib/system/config/config_interface.h" />
+<Unit filename="../../../../include_lib/system/config/config_target.h" />
 <Unit filename="../../../../include_lib/system/config/config_transport.h" />
 <Unit filename="../../../../include_lib/system/database.h" />
 <Unit filename="../../../../include_lib/system/debug.h" />

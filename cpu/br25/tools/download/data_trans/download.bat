@@ -5,8 +5,9 @@ cd %~dp0
 copy ..\..\script.ver .
 copy ..\..\tone.cfg .
 copy ..\..\br25loader.bin .
+copy ..\..\flash_params.bin
 
-..\..\isd_download.exe ..\..\isd_config.ini -tonorflash -dev br25 -boot 0x12000 -div8 -wait 300 -uboot ..\..\uboot.boot -app ..\..\app.bin ..\..\cfg_tool.bin -res tone.cfg  -uboot_compress
+..\..\isd_download.exe ..\..\isd_config.ini -tonorflash -dev br25 -boot 0x12000 -div8 -wait 300 -uboot ..\..\uboot.boot -app ..\..\app.bin ..\..\cfg_tool.bin -res tone.cfg  -uboot_compress -flash-params flash_params.bin
 :: -format all
 ::-reboot 2500
 

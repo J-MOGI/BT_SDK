@@ -190,6 +190,17 @@ SECTIONS
         KEEP(*(.rec_code))
 
 
+        . = ALIGN(4);
+        //mesh scene begin
+        _bt_mesh_scene_entry_sig_list_start = .;
+        KEEP(*(.bt_mesh_scene_entry_sig))
+        _bt_mesh_scene_entry_sig_list_end = .;
+
+        . = ALIGN(4);
+        _bt_mesh_scene_entry_vnd_list_start = .;
+        KEEP(*(.bt_mesh_scene_entry_vnd))
+        _bt_mesh_scene_entry_vnd_list_end = .;
+
 		/********maskrom arithmetic ****/
         *(.opcore_table_maskrom)
         *(.bfilt_table_maskroom)

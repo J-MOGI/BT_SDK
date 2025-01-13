@@ -84,7 +84,9 @@ struct audio_decoder_task 	localtws_decode_task = {0};
 
 u8 audio_dec_inited = 0;
 
+#if TCFG_EQ_ENABLE && TCFG_AUDIO_OUT_EQ_ENABLE
 struct audio_eq_drc *mix_eq_drc = NULL;
+#endif
 
 u8  audio_src_hw_filt[SRC_FILT_POINTS * SRC_CHI * 2 * MAX_SRC_NUMBER] ALIGNED(4); /*SRC的滤波器必须4个byte对齐*/
 s16 mix_buff[AUDIO_MIXER_LEN / 2] SEC(.dec_mix_buff);
@@ -675,8 +677,10 @@ int audio_dec_init()
 
     struct audio_stream_entry *entries[8] = {NULL};
 
+#if TCFG_EQ_ENABLE && TCFG_AUDIO_OUT_EQ_ENABLE
     /*dac_last = audio_stream_dac_out_open();*/
     mix_eq_drc = mix_out_eq_drc_open(sr, ch_num);
+#endif
 
 #if AUDIO_VOCAL_REMOVE_EN
     mix_vocal_remove_hdl = vocal_remove_open(ch_num);
@@ -902,6 +906,7 @@ static int high_bass_th = 0;
 /*----------------------------------------------------------------------------*/
 int high_bass_drc_set_filter_info(int th)
 {
+#if TCFG_EQ_ENABLE && TCFG_AUDIO_OUT_EQ_ENABLE
     /* int th = 0; // -60 ~ 0 db  */
     if (th < -60) {
         th = -60;
@@ -915,6 +920,7 @@ int high_bass_drc_set_filter_info(int th)
         mix_eq_drc->drc->updata = 1;
     }
     local_irq_enable();
+#endif
     return 0;
 }
 
@@ -1033,9 +1039,11 @@ void mix_out_eq_drc_close(struct audio_eq_drc *eq_drc)
 
 void mix_out_high_bass(u32 cmd, struct high_bass *hb)
 {
+#if TCFG_EQ_ENABLE && TCFG_AUDIO_OUT_EQ_ENABLE
     if (mix_eq_drc) {
         audio_eq_drc_parm_update(mix_eq_drc, cmd, (void *)hb);
     }
+#endif
 }
 /*----------------------------------------------------------------------------*/
 /**@brief    mix out后 是否做高低音处理
@@ -1047,9 +1055,11 @@ void mix_out_high_bass(u32 cmd, struct high_bass *hb)
 /*----------------------------------------------------------------------------*/
 void mix_out_high_bass_dis(u32 cmd, u32 dis)
 {
+#if TCFG_EQ_ENABLE && TCFG_AUDIO_OUT_EQ_ENABLE
     if (mix_eq_drc) {
         audio_eq_drc_parm_update(mix_eq_drc, cmd, (void *)dis);
     }
+#endif
 }
 
 #if AUDIO_OUTPUT_AUTOMUTE

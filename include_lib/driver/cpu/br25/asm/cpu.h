@@ -78,12 +78,15 @@ static inline int cpu_in_irq()
     return flag & 0xff;
 }
 
+extern int cpu_irq_disabled();
+#if 0
 static inline int cpu_irq_disabled()
 {
     int flag;
     __asm__ volatile("%0 = icfg" : "=r"(flag));
     return (flag & 0x300) != 0x300 || ((q32DSP(0)->IPMASK) == CPU_IRQ_IPMASK_LEVEL);
 }
+#endif
 
 #if 0
 static inline int data_sat_s16(int ind)

@@ -119,8 +119,8 @@ DEFINES := \
 	-DCONFIG_EVENT_KEY_MAP_ENABLE=0 \
 	-DTIMER_POOL_NUM_CONFIG=10 \
 	-DAPP_ASYNC_POOL_NUM_CONFIG=0 \
-	-DSDK_VERSION_CFG_DEFINE=0x230003 \
-	-DSDK_VERSION_DATE_DEFINE=20240331 \
+	-DSDK_VERSION_CFG_DEFINE=0x240001 \
+	-DSDK_VERSION_DATE_DEFINE=20241231 \
 	-DVFS_ENABLE=1 \
 	-DUSE_SDFILE_NEW=1 \
 	-DVFS_FILE_POOL_NUM_CONFIG=0 \
@@ -401,6 +401,7 @@ LFLAGS := \
 	../../../../cpu/br23/liba/wtgv2_dec_lib.a \
 	../../../../cpu/br23/liba/wav_dec_lib.a  \
 	../../../../cpu/br23/liba/mp3_dec_lib.a \
+	../../../../cpu/br23/liba/lib_pitch_speed.a \
 	../../../../cpu/br23/liba/lib_dns.a \
 	../../../../cpu/br23/liba/lib_midi_dec.a \
 	../../../../cpu/br23/liba/update.a \

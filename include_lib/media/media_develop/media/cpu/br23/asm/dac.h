@@ -186,6 +186,7 @@ struct audio_dac_channel_attr {
     u8  write_mode;         /*DAC写入模式*/
     u16 delay_time;         /*DAC通道延时*/
     u16 protect_time;       /*DAC延时保护时间*/
+    u16 start_delay;        /*DAC起始延时时间(ms)*/
 };
 
 struct audio_dac_channel {

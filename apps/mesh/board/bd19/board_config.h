@@ -16,6 +16,8 @@
  */
 
 #define CONFIG_BOARD_AC632N_DEMO
+//#define CONFIG_BOARD_AC632N_DISTRIBUTOR
+//#define CONFIG_BOARD_AC632N_TARGET
 // #define CONFIG_BOARD_AC6321A_DEMO
 // #define CONFIG_BOARD_AC6323A_DEMO
 // #define CONFIG_BOARD_AC6328A_DEMO
@@ -32,5 +34,6 @@
 #include "board_ac6329c_demo_cfg.h"
 #include "board_ac6329e_demo_cfg.h"
 #include "board_ac6329f_demo_cfg.h"
-
+#include "board_ac632n_distributor_cfg.h"
+#include "board_ac632n_target_node_cfg.h"
 #endif

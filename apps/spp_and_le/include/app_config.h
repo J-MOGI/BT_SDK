@@ -19,6 +19,7 @@
 #define TCFG_MEDIA_LIB_USE_MALLOC		    1
 //apps example 选择,只能选1个,要配置对应的board_config.h
 #define CONFIG_APP_SPP_LE                 1 //SPP + LE or LE's client
+#define CONFIG_APP_FTMS                   0 //FTMS
 #define CONFIG_APP_FINDMY                 0 //FINDMY
 #define CONFIG_APP_MULTI                  0 //蓝牙LE多连 + spp
 #define CONFIG_APP_DONGLE                 0 //usb + 蓝牙(ble 主机),PC hid设备
@@ -196,6 +197,21 @@
 #define FMY_FMCA_TEST_MODE                 0
 //支持pair状态,按键进入或退出测试盒连接模式
 #define FMY_SUPPORT_TEST_BOX_MODE          0
+
+#elif CONFIG_APP_FTMS
+
+//配置双模同名字，同地址
+#define DOUBLE_BT_SAME_NAME                0 //同名字
+#define DOUBLE_BT_SAME_MAC                 0 //同地址
+#define CONFIG_APP_SPP_LE_TO_IDLE          0 //SPP_AND_LE To IDLE Use
+#define CONFIG_BLE_HIGH_SPEED              0 //BLE提速模式: 使能DLE+2M, payload要匹配pdu的包长
+
+//蓝牙BLE配置
+#define CONFIG_BT_GATT_COMMON_ENABLE       1 //配置使用gatt公共模块
+#define CONFIG_BT_SM_SUPPORT_ENABLE        0 //配置是否支持加密
+#define CONFIG_BT_GATT_CLIENT_NUM          0 //配置主机client个数 (支持使能1,search profile)
+#define CONFIG_BT_GATT_SERVER_NUM          1 //配置从机server个数
+#define CONFIG_BT_GATT_CONNECTION_NUM      (CONFIG_BT_GATT_SERVER_NUM + CONFIG_BT_GATT_CLIENT_NUM) //配置连接个数
 
 #else
 #define CONFIG_BT_GATT_COMMON_ENABLE       0

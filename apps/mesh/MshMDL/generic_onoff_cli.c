@@ -12,7 +12,7 @@
 #define LOG_CLI_ENABLE
 #include "debug.h"
 
-#if (CONFIG_MESH_MODEL == SIG_MESH_LIGHT_LIGHTNESS_SERVER)
+#if (CONFIG_BT_MESH_GEN_ONOFF_CLI)
 extern void gpio_pin_write(u8_t led_index, u8_t onoff);
 
 extern u16_t primary_addr;
@@ -83,7 +83,7 @@ static void gen_onoff_status(struct bt_mesh_model *model,
     state = buffer_pull_u8_from_head(buf);
 
     log_info("Node 0x%04x OnOff status from 0x%04x with state 0x%02x\n",
-             bt_mesh_model_elem(model)->addr, ctx->addr, state);
+             bt_mesh_model_elem(model)->rt->addr, ctx->addr, state);
 }
 
 /*
@@ -104,12 +104,12 @@ static void gen_onoff_set_unack(struct bt_mesh_model *model,
                                 struct net_buf_simple *buf)
 {
     struct net_buf_simple *msg = model->pub->msg;
-    struct onoff_state *onoff_state = model->user_data;
+    struct onoff_state *onoff_state = model->rt->user_data;
     int err;
 
     onoff_state->current = buffer_pull_u8_from_head(buf);
     log_info("addr 0x%02x state 0x%02x\n",
-             bt_mesh_model_elem(model)->addr, onoff_state->current);
+             bt_mesh_model_elem(model)->rt->addr, onoff_state->current);
     /* log_info_hexdump((u8 *)onoff_state, sizeof(*onoff_state)); */
 
     gpio_pin_write(onoff_state->led_gpio_pin,

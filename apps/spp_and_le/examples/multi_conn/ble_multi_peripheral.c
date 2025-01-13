@@ -502,7 +502,7 @@ static void multi_adv_config_set(void)
     memcpy(multi_server_adv_config.direct_address_info, &pair_bond_info[1], 7);
 
     if (direct_adv_count) {
-        multi_server_adv_config.adv_type = ADV_DIRECT_IND;
+        multi_server_adv_config.adv_type = ADV_IND; //ADV_DIRECT_IND;//don't use direct adv in multi conn.
         direct_adv_count--;
     } else {
         multi_server_adv_config.adv_type = ADV_IND;

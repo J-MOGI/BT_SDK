@@ -11,6 +11,7 @@
 #include "bt_common.h"
 #include "api/sig_mesh_api.h"
 #include "model_api.h"
+#include "feature_correct.h"
 
 #define LOG_TAG             "[Mesh-OnOff_cli]"
 #define LOG_ERROR_ENABLE
@@ -21,14 +22,6 @@
 #include "debug.h"
 
 #if (CONFIG_MESH_MODEL == SIG_MESH_GENERIC_ONOFF_CLIENT)
-
-extern u16_t primary_addr;
-extern void mesh_setup(void (*init_cb)(void));
-extern void gpio_pin_write(u8_t led_index, u8_t onoff);
-extern void bt_mac_addr_set(u8 *bt_addr);
-extern void prov_complete(u16_t net_idx, u16_t addr);
-extern void prov_reset(void);
-
 /**
  * @brief Config current node features(Relay/Proxy/Friend/Low Power)
  */
@@ -38,7 +31,6 @@ extern void prov_reset(void);
                                                 BT_MESH_FEAT_PROXY | \
                                                 0 \
                                             )
-#include "feature_correct.h"
 const int config_bt_mesh_features = BT_MESH_FEAT_SUPPORTED;
 
 /**
@@ -57,6 +49,12 @@ const u16 config_bt_mesh_proxy_node_adv_interval = ADV_SCAN_UNIT(300); // unit: 
 /*-----------------------------------------------------------*/
 #define BLE_DEV_NAME        'O', 'n', 'O', 'f', 'f', '_', 'c', 'l', 'i'
 
+/**
+ * @brief Conifg MAC of current demo
+ */
+/*-----------------------------------------------------------*/
+#define CUR_DEVICE_MAC_ADDR         0x112233445566
+
 const uint8_t mesh_name[] = {
     // Name
     BYTE_LEN(BLE_DEV_NAME) + 1, BLUETOOTH_DATA_TYPE_COMPLETE_LOCAL_NAME, BLE_DEV_NAME,
@@ -68,12 +66,6 @@ void get_mesh_adv_name(u8 *len, u8 **data)
 
     *data = mesh_name;
 }
-
-/**
- * @brief Conifg MAC of current demo
- */
-/*-----------------------------------------------------------*/
-#define CUR_DEVICE_MAC_ADDR         0x112233445566
 
 
 /*
@@ -93,6 +85,7 @@ void get_mesh_adv_name(u8 *len, u8 **data)
  *
  */
 BT_MESH_MODEL_PUB_DEFINE(gen_onoff_pub_cli, NULL, 2 + 2);
+BT_MESH_HEALTH_PUB_DEFINE(health_pub, 0);
 
 /* Model Operation Codes */
 #define BT_MESH_MODEL_OP_GEN_ONOFF_SET			BT_MESH_MODEL_OP_2(0x82, 0x02)
@@ -105,17 +98,6 @@ BT_MESH_MODEL_PUB_DEFINE(gen_onoff_pub_cli, NULL, 2 + 2);
 /* LED NUMBER */
 #define LED0_GPIO_PIN           0
 
-/*
- * Server Configuration Declaration
- */
-static struct bt_mesh_cfg_srv cfg_srv = {
-    .relay          = BT_MESH_FEATURES_GET(BT_MESH_FEAT_RELAY),
-    .frnd           = BT_MESH_FEATURES_GET(BT_MESH_FEAT_FRIEND),
-    .gatt_proxy     = BT_MESH_FEATURES_GET(BT_MESH_FEAT_PROXY),
-    .beacon         = BT_MESH_BEACON_DISABLED,
-    .default_ttl    = 7,
-};
-
 struct onoff_state {
     u8_t current;
     u8_t previous;
@@ -127,6 +109,13 @@ struct _switch {
     u8_t onoff_state;
 };
 
+static void gen_onoff_status(struct bt_mesh_model *model,
+                             struct bt_mesh_msg_ctx *ctx,
+                             struct net_buf_simple *buf);
+static void health_attention_on(struct bt_mesh_model *mod);
+static void health_attention_off(struct bt_mesh_model *mod);
+
+
 static u8_t trans_id;
 
 static struct onoff_state onoff_state[] = {
@@ -134,9 +123,25 @@ static struct onoff_state onoff_state[] = {
 };
 
 const u8 led_use_port[1] = {
-
     IO_PORTA_01,
+};
 
+/*
+ * OnOff Model Client Op Dispatch Table
+ */
+
+static const struct bt_mesh_model_op gen_onoff_cli_op[] = {
+    { BT_MESH_MODEL_OP_GEN_ONOFF_STATUS, 1, gen_onoff_status },
+    BT_MESH_MODEL_OP_END,
+};
+
+static const struct bt_mesh_health_srv_cb health_srv_cb = {
+    .attn_on = health_attention_on,
+    .attn_off = health_attention_off,
+};
+
+static struct bt_mesh_health_srv health_srv = {
+    .cb = &health_srv_cb,
 };
 
 /*
@@ -156,17 +161,25 @@ static void gen_onoff_status(struct bt_mesh_model *model,
     state = buffer_pull_u8_from_head(buf);
 
     log_info("Node 0x%04x OnOff status from 0x%04x with state 0x%02x\n",
-             bt_mesh_model_elem(model)->addr, ctx->addr, state);
+             bt_mesh_model_elem(model)->rt->addr, ctx->addr, state);
 }
 
-/*
- * OnOff Model Client Op Dispatch Table
- */
 
-static const struct bt_mesh_model_op gen_onoff_cli_op[] = {
-    { BT_MESH_MODEL_OP_GEN_ONOFF_STATUS, 1, gen_onoff_status },
-    BT_MESH_MODEL_OP_END,
-};
+static void health_attention_on(struct bt_mesh_model *mod)
+{
+    log_info(">>>>>>>>>>>>>>>>>health_attention_on\n");
+    for (u8 i = 0; i < sizeof(led_use_port); i++) {
+        led_blink_worker_on(led_use_port[i]);
+    }
+}
+
+static void health_attention_off(struct bt_mesh_model *mod)
+{
+    log_info(">>>>>>>>>>>>>>>>>health_attention_off\n");
+    for (u8 i = 0; i < sizeof(led_use_port); i++) {
+        led_blink_worker_off(led_use_port[i]);
+    }
+}
 
 /*
  * Generic OnOff Model Server Message Handlers
@@ -178,12 +191,12 @@ static void gen_onoff_set_unack(struct bt_mesh_model *model,
                                 struct net_buf_simple *buf)
 {
     struct net_buf_simple *msg = model->pub->msg;
-    struct onoff_state *onoff_state = model->user_data;
+    struct onoff_state *onoff_state = model->rt->user_data;
     int err;
 
     onoff_state->current = buffer_pull_u8_from_head(buf);
     log_info("addr 0x%02x state 0x%02x\n",
-             bt_mesh_model_elem(model)->addr, onoff_state->current);
+             bt_mesh_model_elem(model)->rt->addr, onoff_state->current);
     /* log_info_hexdump((u8 *)onoff_state, sizeof(*onoff_state)); */
 
     gpio_pin_write(onoff_state->led_gpio_pin,
@@ -222,7 +235,8 @@ static void gen_onoff_set_unack(struct bt_mesh_model *model,
  * Element 0 Root Models
  */
 static struct bt_mesh_model root_models[] = {
-    BT_MESH_MODEL_CFG_SRV(&cfg_srv),
+    BT_MESH_MODEL_CFG_SRV,
+    BT_MESH_MODEL_HEALTH_SRV(&health_srv, &health_pub),
     BT_MESH_MODEL(BT_MESH_MODEL_ID_GEN_ONOFF_CLI, gen_onoff_cli_op, &gen_onoff_pub_cli, &onoff_state[0]),
 };
 
@@ -230,14 +244,14 @@ static struct bt_mesh_model root_models[] = {
  * Button to Client Model Assignments
  */
 static struct bt_mesh_model *mod_cli_sw[] = {
-    &root_models[1],
+    &root_models[2],
 };
 
 /*
  * LED to Server Model Assigmnents
  */
 static struct bt_mesh_model *mod_srv_sw[] = {
-    &root_models[1],
+    &root_models[2],
 };
 
 /*
@@ -288,6 +302,7 @@ static bool server_publish(struct _switch *sw)
      * must be configured to either publish to the led's unicast
      * address or a group to which the led is subscribed.
      */
+    u16 primary_addr = get_primary_addr();
     if (primary_addr == BT_MESH_ADDR_UNASSIGNED) {
         NET_BUF_SIMPLE_DEFINE(msg, 1);
         struct bt_mesh_msg_ctx ctx = {
@@ -329,6 +344,40 @@ static void client_publish(struct _switch *sw)
     }
 }
 
+#if PACKET_LOSS_RATE_TEST
+static void msg_send(struct _switch *sw)
+{
+    int err;
+    struct bt_mesh_model *mod_cli;
+    struct bt_mesh_model_pub *pub_cli;
+
+    mod_cli = mod_cli_sw[sw->sw_num];
+    pub_cli = mod_cli->pub;
+
+    if (pub_cli->addr == BT_MESH_ADDR_UNASSIGNED) {
+        return;
+    }
+
+    struct bt_mesh_msg_ctx ctx = {
+        .addr = pub_cli->addr,
+    };
+
+    log_info("send to 0x%04x onoff 0x%04x sw->sw_num 0x%04x\n",
+             ctx.addr, sw->onoff_state, sw->sw_num);
+
+
+    NET_BUF_SIMPLE_DEFINE(msg, 2 + 2 + 4);
+
+    bt_mesh_model_msg_init(&msg, BT_MESH_MODEL_OP_GEN_ONOFF_SET);
+    buffer_add_u8_at_tail(&msg, sw->onoff_state);
+    buffer_add_u8_at_tail(&msg, trans_id++);
+
+    if (bt_mesh_model_send(mod_cli, &ctx, &msg, NULL, (void *)&ctx.recv_dst)) {
+        log_info("Unable to send On Off Status response\n");
+    }
+}
+#endif
+
 /*
  * Button Pressed Worker Task
  */
@@ -349,15 +398,20 @@ static void mesh_init(void)
 {
     log_info("--func=%s", __FUNCTION__);
 
+    bt_conn_cb_register(bt_conn_get_callbacks());
+
     int err = bt_mesh_init(&prov, &composition);
     if (err) {
         log_error("Initializing mesh failed (err %d)\n", err);
         return;
     }
 
-    settings_load();
+    if (IS_ENABLED(CONFIG_BT_SETTINGS)) {
+        settings_load();
+    }
 
-    bt_mesh_prov_enable(BT_MESH_PROV_GATT | BT_MESH_PROV_ADV);
+    bt_mesh_prov_enable(BT_MESH_PROV_GATT);
+
 }
 
 void input_key_handler(u8 key_status, u8 key_number)
@@ -377,17 +431,30 @@ void input_key_handler(u8 key_status, u8 key_number)
         log_info("  [KEY_EVENT_CLICK]  ");
         press_switch.sw_num = key_number;
         press_switch.onoff_state = 1;
+#if PACKET_LOSS_RATE_TEST
+        //wdt_disable();
+        for (int i = 0; i < 100; i++) {
+            os_time_dly(20);
+            msg_send(&press_switch);
+            log_info(">>> send num %d", (i + 1));
+            //wdt_clear();
+        }
+#else
         button_pressed_worker(&press_switch);
+#endif
         break;
+
     case KEY_EVENT_LONG:
         log_info("  [KEY_EVENT_LONG]  ");
         press_switch.sw_num = key_number;
         press_switch.onoff_state = 0;
         button_pressed_worker(&press_switch);
         break;
+
     case KEY_EVENT_HOLD:
         log_info("  [KEY_EVENT_HOLD]  ");
         break;
+
     default :
         return;
     }

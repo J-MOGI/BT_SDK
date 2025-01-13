@@ -44,19 +44,6 @@ extern void bt_ble_adv_enable(u8 enable);
 
 static u8 is_app_active = 0;
 
-static void bt_function_select_init()
-{
-    u8 tmp_ble_addr[6];
-    /* le_controller_set_mac((void*)"012345"); */
-    lib_make_ble_address(tmp_ble_addr, (void *)bt_get_mac_addr());
-    le_controller_set_mac((void *)tmp_ble_addr);
-
-    printf("\n-----edr + ble 's address-----");
-    printf_buf((void *)bt_get_mac_addr(), 6);
-    printf_buf((void *)tmp_ble_addr, 6);
-    /* bt_set_tx_power(9);//0~9 */
-}
-
 static void app_set_soft_poweroff(void)
 {
     log_info("set_soft_poweroff\n");
@@ -80,8 +67,6 @@ static void app_start()
     clk_set("sys", BT_NORMAL_HZ);
     u32 sys_clk =  clk_get("sys");
     bt_pll_para(TCFG_CLOCK_OSC_HZ, sys_clk, 0, 0);
-
-    bt_function_select_init();
 
     btstack_init();
 

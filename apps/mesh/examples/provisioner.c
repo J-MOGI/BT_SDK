@@ -1,10 +1,24 @@
-/*  Bluetooth Mesh */
-
-/*
- * Copyright (c) 2017 Intel Corporation
- *
- * SPDX-License-Identifier: Apache-2.0
- */
+/*************************************************************************************************/
+/*!
+*  \file       provisioner.c
+*
+*  \brief      Main file for example
+*
+*  Copyright (c) 2011-2022 ZhuHai Jieli Technology Co.,Ltd.
+*
+*  Licensed under the Apache License, Version 2.0 (the "License");
+*  you may not use this file except in compliance with the License.
+*  You may obtain a copy of the License at
+*
+*      http://www.apache.org/licenses/LICENSE-2.0
+*
+*  Unless required by applicable law or agreed to in writing, software
+*  distributed under the License is distributed on an "AS IS" BASIS,
+*  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+*  See the License for the specific language governing permissions and
+*  limitations under the License.
+*/
+/*************************************************************************************************/
 
 #include "btstack/bluetooth.h"
 #include "system/includes.h"
@@ -15,8 +29,10 @@
 #include "net.h"
 #include "provisioner_config.h"
 #include "foundation.h"
+#include "feature_correct.h"
+#include "os/os_api.h"
 
-#define LOG_TAG             "[Mesh-Provisioner]"
+#define LOG_TAG             "[Provisioner_demo]"
 #define LOG_ERROR_ENABLE
 #define LOG_DEBUG_ENABLE
 #define LOG_INFO_ENABLE
@@ -26,78 +42,34 @@
 
 #if (CONFIG_MESH_MODEL == SIG_MESH_PROVISIONER)
 
-extern u16_t primary_addr;
-extern void mesh_setup(void (*init_cb)(void));
-extern void gpio_pin_write(u8_t led_index, u8_t onoff);
-extern void bt_mac_addr_set(u8 *bt_addr);
-extern void prov_complete(u16_t net_idx, u16_t addr);
-extern void prov_reset(void);
-
-
-static void provisioner_node_configuration(void);
-/**
- * @brief Config current node features(Relay/Proxy/Friend/Low Power)
- */
-/*-----------------------------------------------------------*/
+/**************************************************************************************************
+Macros
+**************************************************************************************************/
+/* @brief Config current node features(Relay/Proxy/Friend/Low Power) */
 #define BT_MESH_FEAT_SUPPORTED_TEMP         ( \
                                                 0 \
                                             )
-#include "feature_correct.h"
-const int config_bt_mesh_features = BT_MESH_FEAT_SUPPORTED;
+/* @brief Conifg complete local name */
+#define BLE_DEV_NAME        'P', 'r', 'o', 'v', 'i', 's', 'i', 'o', 'n', 'e', 'r'
 
-/**
- * @brief Config proxy connectable adv hardware param
- */
-/*-----------------------------------------------------------*/
-#if BT_MESH_FEATURES_GET(BT_MESH_FEAT_LOW_POWER)
-const u16 config_bt_mesh_proxy_node_adv_interval = ADV_SCAN_UNIT(3000); // unit: ms
-#else
-const u16 config_bt_mesh_proxy_node_adv_interval = ADV_SCAN_UNIT(300); // unit: ms
-#endif /* BT_MESH_FEATURES_GET(BT_MESH_FEAT_LOW_POWER) */
-
-/**
- * @brief Conifg complete local name
- */
-/*-----------------------------------------------------------*/
-#define BLE_DEV_NAME        'P', 'r', 'o', 'v', 'i', 't', 'i', 'o', 'n', 'e', 'r'
-
-const uint8_t mesh_name[] = {
-    // Name
-    BYTE_LEN(BLE_DEV_NAME) + 1, BLUETOOTH_DATA_TYPE_COMPLETE_LOCAL_NAME, BLE_DEV_NAME,
-};
-
-void get_mesh_adv_name(u8 *len, u8 **data)
-{
-    *len = sizeof(mesh_name);
-
-    *data = mesh_name;
-}
-
-/**
- * @brief Conifg MAC of current demo
- */
-/*-----------------------------------------------------------*/
+/* @brief Conifg MAC of current demo */
 #define CUR_DEVICE_MAC_ADDR         		0x112233440000
 
-const u8_t prov_net_key[16] = {
-    0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
-    0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
-};
+/* @brief Conifg MAC of provisionee */
+#define PROVISIONEE_DEVICE_MAC_ADDR         0x112233445566
 
-const u8_t prov_dev_key[16] = {
-    0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
-    0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
-};
+/* Company Identifiers (see Bluetooth Assigned Numbers) */
+#define BT_COMP_ID_LF           0x05D6// Zhuhai Jieli technology Co.,Ltd
 
-const u8_t prov_app_key[16] = {
-    0x06, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
-    0x06, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
-};
+/* Model Operation Codes */
+#define BT_MESH_MODEL_OP_GEN_ONOFF_SET			BT_MESH_MODEL_OP_2(0x82, 0x02)
+#define BT_MESH_MODEL_OP_GEN_ONOFF_SET_UNACK	BT_MESH_MODEL_OP_2(0x82, 0x03)
+#define BT_MESH_MODEL_OP_GEN_ONOFF_STATUS		BT_MESH_MODEL_OP_2(0x82, 0x04)
 
-static u8_t flags;
-static struct bt_mesh_comp prov_comp;
-static uint8_t unprov_uuid[16];
 
+/**************************************************************************************************
+Data Types
+**************************************************************************************************/
 typedef struct {
     u16_t net_idx;
     u16_t addr;
@@ -105,9 +77,25 @@ typedef struct {
     u8_t config_step;
     u8_t config_failed_cnt;
     u8_t uuid[16];
+    u8_t onoff_state;
 } __prov_node;
 
-static __prov_node curr_pair_node;
+/**************************************************************************************************
+Function declaration
+**************************************************************************************************/
+static void provisioner_node_configuration(void);
+static void gen_onoff_status(struct bt_mesh_model *model,
+                             struct bt_mesh_msg_ctx *ctx,
+                             struct net_buf_simple *buf);
+static void provisioner_node_added(u16_t net_idx, u8_t uuid[16], u16_t addr, u8_t num_elem);
+static void get_unprov_beacon(u8_t uuid[16],
+                              bt_mesh_prov_oob_info_t oob_info,
+                              u32_t *uri_hash);
+
+
+/**************************************************************************************************
+Global Variables
+**************************************************************************************************/
 /*
  * Publication Declarations
  *
@@ -126,146 +114,53 @@ static __prov_node curr_pair_node;
  */
 BT_MESH_MODEL_PUB_DEFINE(gen_onoff_pub_cli, NULL, 2 + 2);
 
-/* Company Identifiers (see Bluetooth Assigned Numbers) */
-#define BT_COMP_ID_LF           0x05D6// Zhuhai Jieli technology Co.,Ltd
+static const uint16_t net_idx;
+static const uint16_t app_idx;
 
-/*
- * Server Configuration Declaration
- */
-static struct bt_mesh_cfg_srv cfg_srv = {
-    .relay          = BT_MESH_FEATURES_GET(BT_MESH_FEAT_RELAY),
-    .frnd           = BT_MESH_FEATURES_GET(BT_MESH_FEAT_FRIEND),
-    .gatt_proxy     = BT_MESH_FEATURES_GET(BT_MESH_FEAT_PROXY),
-    .beacon         = BT_MESH_BEACON_DISABLED,
-    .default_ttl    = 7,
+const int config_bt_mesh_features = BT_MESH_FEAT_SUPPORTED;
+
+static u8_t flags;
+static struct bt_mesh_comp prov_comp;
+static uint8_t unprov_uuid[16];
+
+static __prov_node curr_pair_node;
+
+static struct bt_mesh_cfg_cli cfg_cli = {};
+
+const uint8_t mesh_name[] = {
+    BYTE_LEN(BLE_DEV_NAME) + 1, BLUETOOTH_DATA_TYPE_COMPLETE_LOCAL_NAME, BLE_DEV_NAME,
 };
 
-static struct bt_mesh_cfg_cli cfg_cli;
+static const u8_t match_dev_uuid[16] = {MAC_TO_LITTLE_ENDIAN(PROVISIONEE_DEVICE_MAC_ADDR)};
 
-
-/*
- * 给配网者添加generic_onoff_server模型,用于测试实例的待配网设备是否配置成功
- *
- * 不需要可以去掉
- */
-#if 0
-
-BT_MESH_MODEL_PUB_DEFINE(gen_onoff_pub_srv, NULL, 2 + 2);
-
-/* Model Operation Codes */
-#define BT_MESH_MODEL_OP_GEN_ONOFF_GET			BT_MESH_MODEL_OP_2(0x82, 0x01)
-#define BT_MESH_MODEL_OP_GEN_ONOFF_SET			BT_MESH_MODEL_OP_2(0x82, 0x02)
-#define BT_MESH_MODEL_OP_GEN_ONOFF_SET_UNACK	BT_MESH_MODEL_OP_2(0x82, 0x03)
-#define BT_MESH_MODEL_OP_GEN_ONOFF_STATUS		BT_MESH_MODEL_OP_2(0x82, 0x04)
-
-#define LED0_GPIO_PIN           0
-
-struct onoff_state {
-    u8_t current;
-    u8_t previous;
-    u8_t led_gpio_pin;
+const u8_t prov_net_key[16] = {
+    0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
+    0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
 };
 
-static struct onoff_state onoff_state[] = {
-    { .led_gpio_pin = LED0_GPIO_PIN },
+const u8_t prov_dev_key[16] = {
+    0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
+    0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
 };
 
-const u8 led_use_port[] = {
-    IO_PORTA_01,
+const u8_t prov_app_key[16] = {
+    0x06, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
+    0x06, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
 };
 
-static void respond_messsage_schedule(u16 *delay, u16 *duration, void *cb_data)
-{
-    u16 delay_ms;
-    u16 dst_addr = (u16)cb_data;
-
-    pseudo_random_genrate((u8 *)&delay_ms, 2);
-    if (BT_MESH_ADDR_IS_UNICAST(dst_addr)) {
-        delay_ms = btctler_get_rand_from_assign_range(delay_ms, 20, 50);
-    } else {
-        delay_ms = btctler_get_rand_from_assign_range(delay_ms, 20, 200);
-    }
-
-    *delay = delay_ms;
-    log_info("respond_messsage delay =%u ms", delay_ms);
-}
-
-static const struct bt_mesh_send_cb rsp_msg_cb = {
-    .user_intercept = respond_messsage_schedule,
-};
-
-static void gen_onoff_get(struct bt_mesh_model *model,
-                          struct bt_mesh_msg_ctx *ctx,
-                          struct net_buf_simple *buf)
-{
-    NET_BUF_SIMPLE_DEFINE(msg, 2 + 1 + 4);
-    struct onoff_state *onoff_state = model->user_data;
-
-    log_info("addr 0x%04x onoff 0x%02x\n",
-             bt_mesh_model_elem(model)->addr, onoff_state->current);
-    bt_mesh_model_msg_init(&msg, BT_MESH_MODEL_OP_GEN_ONOFF_STATUS);
-    buffer_add_u8_at_tail(&msg, onoff_state->current);
-
-    if (bt_mesh_model_send(model, ctx, &msg, &rsp_msg_cb, (void *)ctx->recv_dst)) {
-        log_info("Unable to send On Off Status response\n");
-    }
-}
-
-static void gen_onoff_set_unack(struct bt_mesh_model *model,
-                                struct bt_mesh_msg_ctx *ctx,
-                                struct net_buf_simple *buf)
-{
-    struct net_buf_simple *msg = model->pub->msg;
-    struct onoff_state *onoff_state = model->user_data;
-    int err;
-
-    onoff_state->current = buffer_pull_u8_from_head(buf);
-    log_info("addr 0x%02x state 0x%02x\n",
-             bt_mesh_model_elem(model)->addr, onoff_state->current);
-    /* log_info_hexdump((u8 *)onoff_state, sizeof(*onoff_state)); */
-
-    gpio_pin_write(onoff_state->led_gpio_pin,
-                   onoff_state->current);
-}
-
-static void gen_onoff_set(struct bt_mesh_model *model,
-                          struct bt_mesh_msg_ctx *ctx,
-                          struct net_buf_simple *buf)
-{
-    log_info("gen_onoff_set\n");
-
-    gen_onoff_set_unack(model, ctx, buf);
-    gen_onoff_get(model, ctx, buf);
-}
-
-/*
- * OnOff Model Server Op Dispatch Table
- *
- */
-static const struct bt_mesh_model_op gen_onoff_srv_op[] = {
-    { BT_MESH_MODEL_OP_GEN_ONOFF_GET, 0, gen_onoff_get },
-    { BT_MESH_MODEL_OP_GEN_ONOFF_SET, 2, gen_onoff_set },
-    { BT_MESH_MODEL_OP_GEN_ONOFF_SET_UNACK, 2, gen_onoff_set_unack },
+static const struct bt_mesh_model_op gen_onoff_cli_op[] = {
+    { BT_MESH_MODEL_OP_GEN_ONOFF_STATUS, 1, gen_onoff_status },
     BT_MESH_MODEL_OP_END,
 };
-#endif
-// test---------------------------------------------------------------------
 
-/*
- *
- * Element Model Declarations
- *
- * Element 0 Root Models
- */
+/* Element 0 Root Models */
 static struct bt_mesh_model root_models[] = {
-    BT_MESH_MODEL_CFG_SRV(&cfg_srv),
+    BT_MESH_MODEL_CFG_SRV,
     BT_MESH_MODEL_CFG_CLI(&cfg_cli), // default for self-configuration network
-    //BT_MESH_MODEL(BT_MESH_MODEL_ID_GEN_ONOFF_SRV, gen_onoff_srv_op, &gen_onoff_pub_srv, &onoff_state[0]),
+    BT_MESH_MODEL(BT_MESH_MODEL_ID_GEN_ONOFF_CLI, gen_onoff_cli_op, &gen_onoff_pub_cli, NULL),
 };
 
-/*
- * Root and Secondary Element Declarations
- */
+/* Root and Secondary Element Declarations */
 static struct bt_mesh_elem elements[] = {
     BT_MESH_ELEM(0, root_models, BT_MESH_MODEL_NONE),
 };
@@ -276,146 +171,8 @@ static const struct bt_mesh_comp composition = {
     .elem_count = ARRAY_SIZE(elements),
 };
 
-static void node_configuration_error()
-{
-    log_error("node configuration error!");
-    memset(&curr_pair_node, 0, sizeof(curr_pair_node));
-    cfg_cli.op_pending = 0;
-    cfg_cli.op_param = NULL;
-    bt_mesh_tx_reset();
-}
-
-/*
- * 节点配置回应检查,没有回应会重发配置消息
- */
-static void node_configuration_check(u32_t opcode)
-{
-    printf("mesh_configuration_check:0x%x", opcode);
-    if (cfg_cli.op_pending != opcode) {
-        log_info("check pass");
-    } else {
-        // 重发超过10次放弃配置节点
-        if (curr_pair_node.config_failed_cnt < 10) {
-            cfg_cli.op_pending = 0;
-            cfg_cli.op_param = NULL;
-            log_info("not get the configuration msg rsp:0x%x, resend", opcode);
-            bt_mesh_tx_reset();
-            provisioner_node_configuration();
-            curr_pair_node.config_failed_cnt++;
-        } else {
-            node_configuration_error();
-        }
-    }
-}
-
-/*
- * 节点配置确认定时器
- */
-static void mesh_set_configuration_check_timer(u32_t opcode)
-{
-    // 节点配置消息发出后3.5秒校验是否有收到回应
-    sys_timeout_add(opcode, node_configuration_check, 3500);
-}
-
-// 发送配置消息失败后重发
-static void config_msg_resend()
-{
-    if (curr_pair_node.config_failed_cnt < 10) {
-        curr_pair_node.config_failed_cnt++;
-        sys_timeout_add(NULL, provisioner_node_configuration, 1500);
-    } else {
-        node_configuration_error();
-    }
-}
-
-/*
- * 节点配置状态机,按步骤配置节点
- *
- * 此处可自定义新添加节点的配置内容
- */
-static void provisioner_node_configuration(void)
-{
-    int err = 0;
-    static uint8_t status;
-
-    log_info("provisioner_node_configuration, step:%d", curr_pair_node.config_step);
-    switch (curr_pair_node.config_step) {
-    case 0:
-        err = bt_mesh_cfg_app_key_add(curr_pair_node.net_idx, curr_pair_node.addr, curr_pair_node.net_idx, 0, prov_app_key, &status);
-        if (err) {
-            config_msg_resend();
-            return;
-        }
-        mesh_set_configuration_check_timer(OP_APP_KEY_STATUS);
-        break;
-    case 1:
-        err = bt_mesh_cfg_mod_app_bind(curr_pair_node.net_idx, curr_pair_node.addr, curr_pair_node.addr, 0, BT_MESH_MODEL_ID_GEN_ONOFF_CLI, &status);
-        if (err) {
-            config_msg_resend();
-            return;
-        }
-        mesh_set_configuration_check_timer(OP_MOD_APP_STATUS);
-        break;
-    case 2:
-        struct bt_mesh_cfg_mod_pub pub = {
-            .addr = PROV_GROUP_ADDR,
-            .app_idx = 0,
-            .cred_flag = 0,
-            .ttl = 7,
-            .period = 0,
-            .transmit = 0,
-        };
-        err = bt_mesh_cfg_mod_pub_set(curr_pair_node.net_idx, curr_pair_node.addr, curr_pair_node.addr, BT_MESH_MODEL_ID_GEN_ONOFF_CLI, &pub, &status);
-        if (err) {
-            config_msg_resend();
-            return;
-        }
-        mesh_set_configuration_check_timer(OP_MOD_PUB_STATUS);
-        break;
-    default:
-        break;
-    }
-    if (curr_pair_node.config_step == 3) {
-        log_info("node Configuration finish!");
-        memset(&curr_pair_node, 0, sizeof(curr_pair_node));
-    }
-}
-
-/*
- * 新节点配网完成回调,开始节点配置
- */
-static void provisioner_node_added(u16_t net_idx, u8_t uuid[16], u16_t addr, u8_t num_elem)
-{
-    log_info("Add new node!");
-
-    log_info("addr:0x%04x", addr);
-    log_info("net_idx:0x%x", net_idx);
-    log_info("num_elem:%d", num_elem);
-    log_info("uuid:");
-    put_buf(uuid, 16);
-
-    curr_pair_node.net_idx = net_idx;
-    curr_pair_node.addr = addr;
-    curr_pair_node.num_elem = num_elem;
-    memcpy(curr_pair_node.uuid, uuid, 16);
-
-    curr_pair_node.config_step = 0;
-    curr_pair_node.config_failed_cnt = 0;
-    provisioner_node_configuration();
-}
-
-/*
- * 扫描到未配网设备beacon回调
- */
-static void get_unprov_beacon(u8_t uuid[16],
-                              bt_mesh_prov_oob_info_t oob_info,
-                              u32_t *uri_hash)
-{
-    printf("get_unprov_beacon, uuid:%s", bt_hex(uuid, 16));
-    memcpy(unprov_uuid, uuid, 16);
-}
-
 static const u8_t dev_uuid[16] = {MAC_TO_LITTLE_ENDIAN(CUR_DEVICE_MAC_ADDR)};
+
 static const struct bt_mesh_prov prov = {
     .uuid = dev_uuid,
 #if 0
@@ -434,24 +191,160 @@ static const struct bt_mesh_prov prov = {
     .unprovisioned_beacon = get_unprov_beacon,
 };
 
+/**************************************************************************************************
+Functions
+**************************************************************************************************/
+void get_mesh_adv_name(u8 *len, u8 **data)
+{
+    *len = sizeof(mesh_name);
+
+    *data = mesh_name;
+}
+
+static void gen_onoff_status(struct bt_mesh_model *model,
+                             struct bt_mesh_msg_ctx *ctx,
+                             struct net_buf_simple *buf)
+{
+    u8_t	state;
+
+    state = buffer_pull_u8_from_head(buf);
+
+    log_info("Node 0x%04x OnOff status from 0x%04x with state 0x%02x\n",
+             bt_mesh_model_elem(model)->rt->addr, ctx->addr, state);
+}
+
+/**
+ * @brief Retransmission after failure to send a configuration message
+ *
+ */
+static void config_msg_resend(void)
+{
+    if (curr_pair_node.config_failed_cnt < 3) {
+        curr_pair_node.config_failed_cnt++;
+        sys_timeout_add(NULL, provisioner_node_configuration, 500);
+    } else {
+        if (curr_pair_node.config_step < 2) {
+            curr_pair_node.config_step++;
+        } else {
+            return;
+        }
+
+        curr_pair_node.config_failed_cnt = 0;
+        sys_timeout_add(NULL, provisioner_node_configuration, 500);
+    }
+}
+
+static void onoff_cli_publish(u16_t addr)
+{
+    int err;
+    struct bt_mesh_model *mod_cli;
+    struct bt_mesh_model_pub *pub_cli;
+
+    mod_cli = &root_models[2];
+    pub_cli = mod_cli->pub;
+
+    pub_cli->addr = addr;
+
+    log_info("publish to 0x%04x onoff_state 0x%x\n", pub_cli->addr, curr_pair_node.onoff_state);
+
+    bt_mesh_model_msg_init(pub_cli->msg,
+                           BT_MESH_MODEL_OP_GEN_ONOFF_SET);
+
+    buffer_add_u8_at_tail(pub_cli->msg, curr_pair_node.onoff_state);
+    buffer_add_u8_at_tail(pub_cli->msg, 0x06);
+    curr_pair_node.onoff_state = !(curr_pair_node.onoff_state);
+    err = bt_mesh_model_publish(mod_cli);
+    if (err) {
+        log_info("bt_mesh_model_publish err %d\n", err);
+    }
+}
+
+/**
+ * @brief Node configuration state machine, step by step node configuration.
+ *
+ */
+static void provisioner_node_configuration(void)
+{
+    int err = 0;
+    static uint8_t status;
+
+    log_info("provisioner_node_configuration, step:%d", curr_pair_node.config_step);
+    switch (curr_pair_node.config_step) {
+    case 0:
+        err = bt_mesh_cfg_cli_app_key_add(curr_pair_node.net_idx, curr_pair_node.addr, curr_pair_node.net_idx, 0, prov_app_key, NULL);
+        config_msg_resend();
+        break;
+
+    case 1:
+        err = bt_mesh_cfg_cli_mod_app_bind(curr_pair_node.net_idx, curr_pair_node.addr, curr_pair_node.addr, 0, BT_MESH_MODEL_ID_GEN_ONOFF_SRV, NULL);
+        config_msg_resend();
+        break;
+
+    case 2:
+        onoff_cli_publish(curr_pair_node.addr);
+        config_msg_resend();
+        break;
+
+    default:
+        break;
+    }
+}
+/**
+ * @brief New node provisioning complete callback, start node configuration.
+ *
+ */
+static void provisioner_node_added(u16_t net_idx, u8_t uuid[16], u16_t addr, u8_t num_elem)
+{
+    log_info("Add new node!");
+
+    log_info("addr:0x%04x", addr);
+    log_info("net_idx:0x%x", net_idx);
+    log_info("num_elem:%d", num_elem);
+    log_info("uuid:");
+    put_buf(uuid, 16);
+
+    curr_pair_node.net_idx = net_idx;
+    curr_pair_node.addr = addr;
+    curr_pair_node.num_elem = num_elem;
+    memcpy(curr_pair_node.uuid, uuid, 16);
+
+    curr_pair_node.config_step = 0;
+    curr_pair_node.config_failed_cnt = 0;
+    curr_pair_node.onoff_state = 1;
+    provisioner_node_configuration();
+}
+
+/**
+ * @brief Scan to unprovisioned beacon callbacks
+ *
+ */
+static void get_unprov_beacon(u8_t uuid[16],
+                              bt_mesh_prov_oob_info_t oob_info,
+                              u32_t *uri_hash)
+{
+    log_info("get_unprov_beacon, uuid:%s", bt_hex(uuid, 16));
+    memcpy(unprov_uuid, uuid, 16);
+}
+
 static u8_t show_node(struct bt_mesh_cdb_node *node,
                       void *user_data)
 {
-    printf("\n[node addr = 0x%x]\n", node->addr);
-    printf("uuid = %s\n", bt_hex(node->uuid, 6));
-    printf("net_idx = 0x%x\n", node->net_idx);
-    printf("num_elem = %d\n", node->num_elem);
-    printf("dev_key = %s\n", bt_hex(node->dev_key, 16));
+    log_info("\n[node addr = 0x%x]\n", node->addr);
+    log_info("uuid = %s\n", bt_hex(node->uuid, 6));
+    log_info("net_idx = 0x%x\n", node->net_idx);
+    log_info("num_elem = %d\n", node->num_elem);
+    log_info("dev_key = %s\n", bt_hex(node->dev_key.key, 16));
 
     return 1;
 }
 
-/*
- * 显示所有配网的设备
+/**
+ * @brief Show all provisioned devices
+ *
  */
 static void Provisioner_show_cdb_node(void)
 {
-    printf("Provisioner_show_cdb_node\n");
+    log_info("Provisioner_show_cdb_node\n");
 
     bt_mesh_cdb_node_foreach(show_node, NULL);
 }
@@ -459,20 +352,21 @@ static void Provisioner_show_cdb_node(void)
 static u8_t del_node(struct bt_mesh_cdb_node *node,
                      void *user_data)
 {
-    printf("\n<Del> [node addr = 0x%x]\n", node->addr);
+    log_info("\n<Del> [node addr = 0x%x]\n", node->addr);
 
     bt_mesh_cdb_node_del(node, true);
 
     return 1;
 }
 
-/*
- * 清除配网节点记录
+/**
+ * @brief Clearing provisioned node records
+ *
  */
 static void clear_store_node(void)
 {
     log_info("clear_store_node");
-    clear_rpl();
+    // clear_rpl();
     bt_mesh_cdb_node_foreach(del_node, NULL);
 }
 
@@ -481,34 +375,6 @@ static u8_t get_store_node_num(struct bt_mesh_cdb_node *node,
 {
     *(u8_t *)user_data += 1;
     return 1;
-}
-
-/*
- * 发起配网
- */
-int bt_mesh_provision_adv(const uint8_t uuid[16], uint16_t net_idx, uint16_t addr,
-                          uint8_t attention_duration)
-{
-    u8_t node_cnt = 0;
-    bt_mesh_cdb_node_foreach(get_store_node_num, &node_cnt);
-
-    if (node_cnt >= CONFIG_BT_MESH_CDB_NODE_COUNT) {
-        log_error("node store is full!");
-        return -1;
-    }
-
-    if (bt_mesh_cdb_subnet_get(net_idx) == NULL) {
-        log_error("subnet is NULL!");
-        return -EINVAL;
-    }
-
-    if (IS_ENABLED(CONFIG_BT_MESH_PROVISIONER) && IS_ENABLED(CONFIG_BT_MESH_PB_ADV)) {
-        return bt_mesh_pb_adv_open(uuid, net_idx, addr,
-                                   attention_duration);
-    }
-
-    log_error("provisioner is no support!");
-    return -ENOTSUP;
 }
 
 static void provisioner_reset()
@@ -550,15 +416,15 @@ void input_key_handler(u8 key_status, u8 key_number)
     if (key_status == KEY_EVENT_CLICK) {
         switch (key_number) {
         case 0:
-            // 显示已配网节点
+            /* show all provisioned devices */
             Provisioner_show_cdb_node();
             break;
         case 1:
-            // 清理配网节点记录
+            /* Clearing provisioned node records */
             clear_store_node();
             break;
-        case 5:
-            // 对最后扫描到的设备uuid发起配网
+        case 4:
+            /* Initiate provisioning for the last scanned device uuid */
             bt_mesh_provision_adv(unprov_uuid, PROV_NET_IDX, BT_MESH_ADDR_UNASSIGNED, 0);
             break;
         default:
@@ -567,39 +433,59 @@ void input_key_handler(u8 key_status, u8 key_number)
     }
 }
 
-/*
- * 节点配置回调,每条配置消息收到回复后调用
- */
-static void node_config_cmd_rsp_cb(u32_t opcode)
+static void mod_app_bind(void)
 {
-    printf("node_config_cmd_rsp_cb, opcode:0x%x", opcode);
-    cfg_cli.op_pending = 0;
-    cfg_cli.op_param = NULL;
+    int err;
 
-    curr_pair_node.config_step++;
-    provisioner_node_configuration();
+    err = bt_mesh_cfg_cli_mod_app_bind(PROV_NET_IDX, PROVISIONER_ADDR, PROVISIONER_ADDR, PROV_APP_IDX,
+                                       BT_MESH_MODEL_ID_GEN_ONOFF_CLI, NULL);
+    if (err) {
+        log_error("Failed to bind app-key (err %d)\n", err);
+        return;
+    }
+
+    log_info("Configuration complete\n");
+
+    struct bt_mesh_cdb_node *node;
+    uint16_t addr = 0x01;
+    do {
+        node = bt_mesh_cdb_node_get(addr);
+        if (node) {
+            log_info("cdb node addr: 0x%x , onoff cli send 10 times.", node->addr);
+            for (int i = 0; i < 10; i++) {
+                onoff_cli_publish(node->addr);
+                os_time_dly(100);
+            }
+            addr++;
+        } else {
+            log_info("provisioner don't have node now.");
+            break;
+        }
+    } while (1);
+
 }
 
-/*
- * 配网者自配置
+/**
+ * @brief Provisioner config self.
+ *
  */
-static void self_configure(void)
+static void configure_self(void)
 {
-    u16_t elem_addr = 0x0001;
+    int err;
 
-    int err = 0;
-    err = bt_mesh_cfg_app_key_add(PROV_NET_IDX, PROV_NODE_ADDR, PROV_NET_IDX, PROV_APP_IDX, prov_app_key, NULL);
+    log_info("Configuring self...\n");
+
+    /* Add Application Key */
+    err = bt_mesh_cfg_cli_app_key_add(PROV_NET_IDX, PROVISIONER_ADDR, PROV_NET_IDX, PROV_APP_IDX,
+                                      prov_app_key, NULL);
+
     if (err) {
-        log_info("add app key err:%d!", err);
+        log_error("Failed to add app-key (err %d)\n", err);
+        return;
     }
-    err = bt_mesh_cfg_mod_app_bind(PROV_NET_IDX, PROV_NODE_ADDR, elements[0].addr, PROV_APP_IDX, BT_MESH_MODEL_ID_GEN_ONOFF_SRV, NULL);
-    if (err) {
-        log_info("bind app key err:%d!", err);
-    }
-    err = bt_mesh_cfg_mod_sub_add(PROV_NET_IDX, PROV_NODE_ADDR, elements[0].addr, PROV_GROUP_ADDR, BT_MESH_MODEL_ID_GEN_ONOFF_SRV, NULL);
-    if (err) {
-        log_info("add sub addr err:%d!", err);
-    }
+
+    /* Bind to onoff client model should be tasked until app key add*/
+    sys_timeout_add(NULL, mod_app_bind, 100);
 }
 
 static void mesh_init(void)
@@ -612,22 +498,15 @@ static void mesh_init(void)
         return;
     }
 
-    settings_load();
-
-    err = bt_mesh_provision(prov_net_key, PROV_NET_IDX, flags, PROV_IV_IDX, PROV_NODE_ADDR, prov_dev_key);
-    if (err) {
-        log_info("Using stored settings\n");
-    } else {
-        log_info("Provisioning completed\n");
-        self_configure();
+    if (IS_ENABLED(CONFIG_BT_SETTINGS)) {
+        settings_load();
     }
-
-    mesh_cli_cmd_rsp_callback_register(node_config_cmd_rsp_cb);
 
     bt_mesh_cdb_create(prov_net_key);
 
-    bt_mesh_prov_enable(BT_MESH_PROV_GATT | BT_MESH_PROV_ADV);
-    //sys_timer_add(NULL, mem_stats, 1000);
+    err = bt_mesh_provision(prov_net_key, PROV_NET_IDX, flags, PROV_IV_IDX, PROVISIONER_ADDR, prov_dev_key);
+
+    configure_self();
 }
 
 void bt_ble_init(void)

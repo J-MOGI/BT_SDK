@@ -243,6 +243,8 @@
 
 //enc 编码 demo文件
 #define ENC_DEMO_EN                        DISABLE
+#define TCFG_SPEED_PITCH_ENABLE            DISABLE    //提示音倍速功能
+#define TCFG_SPEED_MODE           		   (1.0f)    //倍速配置,(如二倍速就是(2.0f))
 
 
 #define TCFG_DEC_WAV_ENABLE					DISABLE

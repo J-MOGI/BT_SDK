@@ -210,6 +210,10 @@ void app_main()
     it.name = "findmy";
     it.action = ACTION_FINDMY;
 
+#elif CONFIG_APP_FTMS
+    it.name = "ftms";
+    it.action = ACTION_FTMS;
+
 #else
     while (1) {
         printf("no app!!!");

@@ -89,6 +89,7 @@ CFLAGS := \
 	-Wframe-larger-than=256 \
 	-Wreturn-type \
 	-Wimplicit-function-declaration \
+	-Werror=jl-arg-struct-check \
 	-fms-extensions \
 
 
@@ -119,8 +120,8 @@ DEFINES := \
 	-DCONFIG_EVENT_KEY_MAP_ENABLE=0 \
 	-DTIMER_POOL_NUM_CONFIG=10 \
 	-DAPP_ASYNC_POOL_NUM_CONFIG=0 \
-	-DSDK_VERSION_CFG_DEFINE=0x230003 \
-	-DSDK_VERSION_DATE_DEFINE=20240331 \
+	-DSDK_VERSION_CFG_DEFINE=0x240001 \
+	-DSDK_VERSION_DATE_DEFINE=20241231 \
 	-DVFS_ENABLE=1 \
 	-DUSE_SDFILE_NEW=1 \
 	-DVFS_FILE_POOL_NUM_CONFIG=0 \

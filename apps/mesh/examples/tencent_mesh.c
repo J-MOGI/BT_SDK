@@ -17,16 +17,6 @@
 #include "debug.h"
 
 #if (CONFIG_MESH_MODEL == SIG_MESH_TENCENT_MESH)
-
-extern u16_t primary_addr;
-extern void mesh_setup(void (*init_cb)(void));
-extern void gpio_pin_write(u8_t led_index, u8_t onoff);
-extern void bt_mac_addr_set(u8 *bt_addr);
-extern void prov_complete(u16_t net_idx, u16_t addr);
-extern void prov_reset(void);
-extern uint32_t btctler_get_rand_from_assign_range(uint32_t rand, uint32_t min, uint32_t max);
-extern void pseudo_random_genrate(uint8_t *dest, unsigned size);
-
 /*
  * @brief Config current node features(Relay/Proxy/Friend/Low Power)
  */
@@ -171,18 +161,6 @@ BT_MESH_MODEL_PUB_DEFINE(vendor_pub_srv, tencent_vendor_update, 3 + 1 + 2 + 4);
 #define ACCESS_PARAM_SIZE                       (MAX_USEFUL_ACCESS_PAYLOAD_SIZE - ACCESS_OP_SIZE)
 
 /*
- * @brief Server Configuration Declaration
- */
-/*-----------------------------------------------------------*/
-static struct bt_mesh_cfg_srv cfg_srv = {
-    .relay          = BT_MESH_FEATURES_GET(BT_MESH_FEAT_RELAY),
-    .frnd           = BT_MESH_FEATURES_GET(BT_MESH_FEAT_FRIEND),
-    .gatt_proxy     = BT_MESH_FEATURES_GET(BT_MESH_FEAT_PROXY),
-    .beacon         = BT_MESH_BEACON_DISABLED,
-    .default_ttl    = 3,
-};
-
-/*
  * @brief Generic OnOff State Set
  */
 /*-----------------------------------------------------------*/
@@ -222,7 +200,7 @@ static uint8_t hex_to_ascii(u8 in)
     } else if (in >= 0xa && in <= 0xf) {
         return in - 0xa + 'a';
     } else {
-        printf("joy ascii to hex error, data:0x%x", in);
+        log_info("joy ascii to hex error, data:0x%x", in);
         return 0;
     }
 }
@@ -275,10 +253,10 @@ static void respond_messsage_schedule(u16 *delay, u16 *duration, void *cb_data)
     log_info("respond_messsage delay =%u ms", delay_ms);
 }
 
-static const struct bt_mesh_send_cb rsp_msg_cb = {
-    .user_intercept = respond_messsage_schedule,
-    /* .user_intercept = NULL, */
-};
+// static const struct bt_mesh_send_cb rsp_msg_cb = {
+//     .user_intercept = respond_messsage_schedule,
+//     /* .user_intercept = NULL, */
+// };
 
 /*
  * @brief Tencent Vendor Model Message Handlers
@@ -286,7 +264,7 @@ static const struct bt_mesh_send_cb rsp_msg_cb = {
 /*-----------------------------------------------------------*/
 void llsync_vendor_attr_send(uint32_t opcode, void *buf, u16 len)
 {
-    printf("llsync_vendor_attr_send len:%d", len);
+    log_info("llsync_vendor_attr_send len:%d", len);
     NET_BUF_SIMPLE_DEFINE(msg, 3 + len + TRANSMIC_SIZE);
 
     bt_mesh_model_msg_init(&msg, opcode);
@@ -305,14 +283,14 @@ static void gen_onoff_get(struct bt_mesh_model *model,
                           struct net_buf_simple *buf)
 {
     NET_BUF_SIMPLE_DEFINE(msg, 2 + 1 + 4);
-    struct onoff_state *onoff_state = model->user_data;
+    struct onoff_state *onoff_state = model->rt->user_data;
 
     log_info("addr 0x%04x onoff 0x%02x\n",
-             bt_mesh_model_elem(model)->addr, onoff_state->current);
+             bt_mesh_model_elem(model)->rt->addr, onoff_state->current);
     bt_mesh_model_msg_init(&msg, BT_MESH_MODEL_OP_GEN_ONOFF_STATUS);
     buffer_add_u8_at_tail(&msg, onoff_state->current);
 
-    if (bt_mesh_model_send(model, ctx, &msg, &rsp_msg_cb, (void *)ctx->recv_dst)) {
+    if (bt_mesh_model_send(model, ctx, &msg, NULL/*&rsp_msg_cb*/, (void *)ctx->recv_dst)) {
         log_info("Unable to send On Off Status response\n");
     }
 }
@@ -322,12 +300,12 @@ static void gen_onoff_set_unack(struct bt_mesh_model *model,
                                 struct net_buf_simple *buf)
 {
     struct net_buf_simple *msg = model->pub->msg;
-    struct onoff_state *onoff_state = model->user_data;
+    struct onoff_state *onoff_state = model->rt->user_data;
     int err;
 
     onoff_state->current = buffer_pull_u8_from_head(buf);
     log_info("addr 0x%02x state 0x%02x\n",
-             bt_mesh_model_elem(model)->addr, onoff_state->current);
+             bt_mesh_model_elem(model)->rt->addr, onoff_state->current);
 }
 
 static void gen_onoff_set(struct bt_mesh_model *model,
@@ -362,6 +340,8 @@ static void vendor_attr_set(struct bt_mesh_model *model,
     log_info("receive vendor_attr_set, len except opcode =0x%x", buf->len);
     log_info_hexdump(buf->data, buf->len);
     llsync_mesh_recv_data_handle(VENDOR_MESSAGE_ATTRIBUTE_SET, buf->data, buf->len);
+    gpio_pin_write(onoff_state->led_gpio_pin,
+                   onoff_state->current);
 }
 
 static void vendor_attr_set_unack(struct bt_mesh_model *model,
@@ -418,7 +398,7 @@ static const struct bt_mesh_model_op vendor_srv_op[] = {
  */
 /*-----------------------------------------------------------*/
 static struct bt_mesh_model root_models[] = {
-    BT_MESH_MODEL_CFG_SRV(&cfg_srv),
+    BT_MESH_MODEL_CFG_SRV,
     BT_MESH_MODEL(BT_MESH_MODEL_ID_GEN_ONOFF_SRV, gen_onoff_srv_op, &gen_onoff_pub_srv, &onoff_state[0]),
     BT_MESH_MODEL(BT_MESH_MODEL_ID_LIGHT_LIGHTNESS_SRV, gen_onoff_srv_op, &gen_onoff_pub_srv, &onoff_state[0]),
 };
@@ -489,7 +469,7 @@ static void llsync_led_switch()
 {
     ble_property_t *sg_ble_property_array = llsync_mesh_property_array_get();
     onoff_state[0].current = !onoff_state[0].current;
-    printf("key_press led set to %d", onoff_state[0].current);
+    log_info("key_press led set to %d", onoff_state[0].current);
 
     gpio_pin_write(onoff_state[0].led_gpio_pin, onoff_state[0].current);
     sg_ble_property_array[0].set_cb(&onoff_state[0].current, 1);
@@ -536,13 +516,18 @@ static void mesh_init(void)
 
     llsync_mesh_init();
 
+    bt_conn_cb_register(bt_conn_get_callbacks());
+
     int err = bt_mesh_init(&prov, &composition);
     if (err) {
         log_error("Initializing mesh failed (err %d)\n", err);
         return;
     }
 
-    settings_load();
+    if (IS_ENABLED(CONFIG_BT_SETTINGS)) {
+        settings_load();
+    }
+
     bt_mesh_prov_enable(BT_MESH_PROV_GATT | BT_MESH_PROV_ADV);
     mesh_proxy_connect_finish_callback_register(llsync_mesh_vendor_data_report);
 }

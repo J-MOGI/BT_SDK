@@ -88,7 +88,9 @@ struct audio_decoder_task 	localtws_decode_task = {0};
 
 static u8 audio_dec_inited = 0;
 
+#if TCFG_EQ_ENABLE && TCFG_AUDIO_OUT_EQ_ENABLE
 struct audio_eq_drc *mix_eq_drc = NULL;
+#endif
 #if AUDIO_EQUALLOUDNESS_CONFIG
 loudness_hdl *loudness;
 #endif
@@ -1017,6 +1019,7 @@ static int high_bass_th = 0;
 /*----------------------------------------------------------------------------*/
 int high_bass_drc_set_filter_info(int th)
 {
+#if TCFG_EQ_ENABLE && TCFG_AUDIO_OUT_EQ_ENABLE
     /* int th = 0; // -60 ~ 0 db  */
     if (th < -60) {
         th = -60;
@@ -1030,6 +1033,7 @@ int high_bass_drc_set_filter_info(int th)
         mix_eq_drc->drc->updata = 1;
     }
     local_irq_enable();
+#endif
     return 0;
 }
 
@@ -1067,7 +1071,7 @@ int high_bass_drc_get_filter_info(void *drc, struct audio_drc_filter_info *info)
 void *mix_out_eq_drc_open(u16 sample_rate, u8 ch_num)
 {
 
-#if TCFG_EQ_ENABLE
+#if TCFG_EQ_ENABLE && TCFG_AUDIO_OUT_EQ_ENABLE
 
     struct audio_eq_drc *eq_drc = NULL;
     struct audio_eq_drc_parm effect_parm = {0};
@@ -1117,7 +1121,7 @@ void *mix_out_eq_drc_open(u16 sample_rate, u8 ch_num)
 /*----------------------------------------------------------------------------*/
 void mix_out_eq_drc_close(struct audio_eq_drc *eq_drc)
 {
-#if TCFG_EQ_ENABLE
+#if TCFG_EQ_ENABLE && TCFG_AUDIO_OUT_EQ_ENABLE
 #if TCFG_AUDIO_OUT_EQ_ENABLE
     if (eq_drc) {
         audio_eq_drc_close(eq_drc);
@@ -1146,9 +1150,11 @@ void mix_out_eq_drc_close(struct audio_eq_drc *eq_drc)
 
 void mix_out_high_bass(u32 cmd, struct high_bass *hb)
 {
+#if TCFG_EQ_ENABLE && TCFG_AUDIO_OUT_EQ_ENABLE
     if (mix_eq_drc) {
         audio_eq_drc_parm_update(mix_eq_drc, cmd, (void *)hb);
     }
+#endif
 }
 /*----------------------------------------------------------------------------*/
 /**@brief    mix out后 是否做高低音处理
@@ -1160,9 +1166,11 @@ void mix_out_high_bass(u32 cmd, struct high_bass *hb)
 /*----------------------------------------------------------------------------*/
 void mix_out_high_bass_dis(u32 cmd, u32 dis)
 {
+#if TCFG_EQ_ENABLE && TCFG_AUDIO_OUT_EQ_ENABLE
     if (mix_eq_drc) {
         audio_eq_drc_parm_update(mix_eq_drc, cmd, (void *)dis);
     }
+#endif
 }
 
 #if AUDIO_OUTPUT_AUTOMUTE

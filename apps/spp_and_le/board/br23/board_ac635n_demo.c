@@ -47,6 +47,15 @@ const struct low_power_param power_param = {
 #if TCFG_RTC_ALARM_ENABLE
     .rtc_clk    	= CLK_SEL_32K,
 #endif
+
+#if TCFG_USE_VIRTUAL_RTC
+    .virtual_rtc    = 1,
+    .vir_rtc_trim_time = 60 * 20,
+    .nv_timer_interval = 500,                           //s,lp_timer中断间隔
+#else
+    .user_nv_timer_en  = 0,
+#endif
+
 };
 
 
@@ -240,6 +249,19 @@ u8 get_power_on_status(void)
     return 0;
 }
 
+void alm_wakeup_isr()
+{
+    printf("alarm_wakeup_isr!!!!!");
+}
+void  set_rtc_default_time(struct sys_time *t)
+{
+    t->year = 2020;
+    t->month = 2;
+    t->day = 28;
+    t->hour = 23;
+    t->min = 59;
+    t->sec = 40;
+}
 
 static void board_devices_init(void)
 {
@@ -249,6 +271,10 @@ static void board_devices_init(void)
 
 #if (TCFG_IOKEY_ENABLE || TCFG_ADKEY_ENABLE || TCFG_IRKEY_ENABLE || TCFG_TOUCH_KEY_ENABLE)
 	key_driver_init();
+#endif
+
+#if TCFG_USE_VIRTUAL_RTC
+    vir_rtc_simulate_init(NULL, NULL);
 #endif
 
 #if TCFG_RTC_ALARM_ENABLE

@@ -6,7 +6,7 @@
 #include "model_api.h"
 #include "unix_timestamp.h"
 
-#define LOG_TAG             "[Mesh-AliSocket]"
+#define LOG_TAG             "[Mesh-AliFan]"
 #define LOG_ERROR_ENABLE
 #define LOG_DEBUG_ENABLE
 #define LOG_INFO_ENABLE
@@ -15,16 +15,6 @@
 #include "debug.h"
 
 #if (CONFIG_MESH_MODEL == SIG_MESH_ALIGENIE_FAN)
-
-extern u16_t primary_addr;
-extern void mesh_setup(void (*init_cb)(void));
-extern void gpio_pin_write(u8_t led_index, u8_t onoff);
-extern void bt_mac_addr_set(u8 *bt_addr);
-extern void prov_complete(u16_t net_idx, u16_t addr);
-extern void prov_reset(void);
-extern uint32_t btctler_get_rand_from_assign_range(uint32_t rand, uint32_t min, uint32_t max);
-extern void pseudo_random_genrate(uint8_t *dest, unsigned size);
-
 #if (defined(CONFIG_CPU_BD19))
 extern void timer_pwm_init(JL_TIMER_TypeDef *JL_TIMERx, u32 pwm_io, u32 fre, u32 duty);
 extern void set_led_duty(u16 duty);
@@ -70,7 +60,7 @@ const u16 config_bt_mesh_proxy_node_adv_interval = ADV_SCAN_UNIT(300); // unit: 
  * @brief Conifg complete local name
  */
 /*-----------------------------------------------------------*/
-#define BLE_DEV_NAME        'A', 'G', '-', 'S', 'o', 'c', 'k', 'e', 't'
+#define BLE_DEV_NAME        'A', 'G', '-', 'F', 'a', 'n'
 
 const uint8_t mesh_name[] = {
     // Name
@@ -284,18 +274,6 @@ static bool indicate_flag[256];
 #define ACCESS_PARAM_SIZE                       (MAX_USEFUL_ACCESS_PAYLOAD_SIZE - ACCESS_OP_SIZE)
 
 /*
- * @brief Server Configuration Declaration
- */
-/*-----------------------------------------------------------*/
-static struct bt_mesh_cfg_srv cfg_srv = {
-    .relay          = BT_MESH_FEATURES_GET(BT_MESH_FEAT_RELAY),
-    .frnd           = BT_MESH_FEATURES_GET(BT_MESH_FEAT_FRIEND),
-    .gatt_proxy     = BT_MESH_FEATURES_GET(BT_MESH_FEAT_PROXY),
-    .beacon         = BT_MESH_BEACON_ENABLED,
-    .default_ttl    = 7,
-};
-
-/*
  * @brief Generic OnOff State Set
  */
 /*-----------------------------------------------------------*/
@@ -318,7 +296,7 @@ static struct onoff_state onoff_state[] = {
 };
 
 const u8 led_use_port[] = {
-    IO_PORTB_07,
+    IO_PORTA_01,
 };
 
 
@@ -356,10 +334,10 @@ static void respond_messsage_schedule(u16 *delay, u16 *duration, void *cb_data)
     log_info("respond_messsage delay =%u ms", delay_ms);
 }
 
-static const struct bt_mesh_send_cb rsp_msg_cb = {
-    .user_intercept = respond_messsage_schedule,
-    /* .user_intercept = NULL, */
-};
+// static const struct bt_mesh_send_cb rsp_msg_cb = {
+//     .user_intercept = respond_messsage_schedule,
+//     /* .user_intercept = NULL, */
+// };
 
 /*
  * @brief AliGenie Vendor Model Message Handlers
@@ -410,10 +388,10 @@ void comfirm_check(struct __comfirm_check_param *param)
         param->resend_cnt += 1;
         if (param->resend_cnt >= 10) {  //最多重传75次，即30秒重传时间
             sys_timer_remove(timer_index[param->timer_cnt]);
-            printf("resend msg more than 75 times\r\n");
+            log_info("resend msg more than 75 times\r\n");
         }
-        printf("indicate_flag[ %d ] = %d\r\n", param->indicate_tid, indicate_flag[param->indicate_tid]);
-        printf("\n  param->buf.tid = %d, timer_cnt = %d \n", ((struct __onoff_repo *)(param->buf))->TID, param->timer_cnt);
+        log_info("indicate_flag[ %d ] = %d\r\n", param->indicate_tid, indicate_flag[param->indicate_tid]);
+        log_info("\n  param->buf.tid = %d, timer_cnt = %d \n", ((struct __onoff_repo *)(param->buf))->TID, param->timer_cnt);
         vendor_attr_status_send(&vendor_server_models[0], &ctx, param->buf, param->len);
     } else {
         sys_timer_remove(timer_index[param->timer_cnt]);
@@ -425,14 +403,17 @@ static void gen_onoff_get(struct bt_mesh_model *model,
                           struct net_buf_simple *buf)
 {
     NET_BUF_SIMPLE_DEFINE(msg, 2 + 1 + 4);
-    struct onoff_state *onoff_state = model->user_data;
+    struct onoff_state *onoff_state = model->rt->user_data;
 
     log_info("addr 0x%04x onoff 0x%02x\n",
-             bt_mesh_model_elem(model)->addr, onoff_state->current);
+             bt_mesh_model_elem(model)->rt->addr, onoff_state->current);
     bt_mesh_model_msg_init(&msg, BT_MESH_MODEL_OP_GEN_ONOFF_STATUS);
     buffer_add_u8_at_tail(&msg, onoff_state->current);
 
-    if (bt_mesh_model_send(model, ctx, &msg, &rsp_msg_cb, (void *)ctx->recv_dst)) {
+    /* delay for send msg because adv timer duration is 50ms. */
+    os_time_dly(5);
+
+    if (bt_mesh_model_send(model, ctx, &msg, NULL/*&rsp_msg_cb*/, (void *)ctx->recv_dst)) {
         log_info("Unable to send On Off Status response\n");
     }
 }
@@ -442,12 +423,12 @@ static void gen_onoff_set_unack(struct bt_mesh_model *model,
                                 struct net_buf_simple *buf)
 {
     struct net_buf_simple *msg = model->pub->msg;
-    struct onoff_state *onoff_state = model->user_data;
+    struct onoff_state *onoff_state = model->rt->user_data;
     int err;
 
     onoff_state->current = buffer_pull_u8_from_head(buf);
     log_info("addr 0x%02x state 0x%02x\n",
-             bt_mesh_model_elem(model)->addr, onoff_state->current);
+             bt_mesh_model_elem(model)->rt->addr, onoff_state->current);
     /* log_info_hexdump((u8 *)onoff_state, sizeof(*onoff_state)); */
 
     if (onoff_state->current) {
@@ -457,7 +438,10 @@ static void gen_onoff_set_unack(struct bt_mesh_model *model,
     }
 
     led_flag = onoff_state->current;
-    printf("\n   tmall set led to %d    \n", led_flag);
+    log_info("\n   tmall set led to %d    \n", led_flag);
+
+    gpio_pin_write(onoff_state->led_gpio_pin,
+                   onoff_state->current);
 
     indicate_tid_get(&indicate_tid);
     timer_cnt_get(&timer_cnt);
@@ -483,7 +467,7 @@ static void gen_onoff_set_unack(struct bt_mesh_model *model,
     comfirm_check_param[timer_cnt].buf = &onoff_repo_set[onoff_repo_set_cnt];
     comfirm_check_param[timer_cnt].len = sizeof(onoff_repo_set[onoff_repo_set_cnt]);
 
-    printf("\n  set unack tid = %d, timer_cnt = %d, param.tid = %d  \n", onoff_repo_set[onoff_repo_set_cnt].TID, timer_cnt, comfirm_check_param[timer_cnt].indicate_tid);
+    log_info("\n  set unack tid = %d, timer_cnt = %d, param.tid = %d  \n", onoff_repo_set[onoff_repo_set_cnt].TID, timer_cnt, comfirm_check_param[timer_cnt].indicate_tid);
 
     vendor_attr_status_send(&vendor_server_models[0], ctx, &onoff_repo_set[onoff_repo_set_cnt], sizeof(onoff_repo_set[onoff_repo_set_cnt]));
     timer_index[timer_cnt] = sys_timer_add(&comfirm_check_param[timer_cnt], comfirm_check, 400);
@@ -529,7 +513,7 @@ static void timer_handler(struct __timer_param *param)
     gpio_pin_write(LED0_GPIO_PIN, param->onoff);
     led_flag = param->onoff;
 
-    printf("timer_cnt = %d, timer_index = 0x%x, onoff = %d", param->timer_cnt, timer_index[param->timer_cnt], param->onoff);
+    log_info("timer_cnt = %d, timer_index = 0x%x, onoff = %d", param->timer_cnt, timer_index[param->timer_cnt], param->onoff);
 
     sys_timer_remove(timer_index[param->timer_cnt]);
 
@@ -568,7 +552,7 @@ static void set_timer_start(u8      tid,
     timer_param[timer_cnt].timer_cnt = timer_cnt;
 
 
-    printf("time_cnt = %d\r\n", timer_cnt);
+    log_info("time_cnt = %d\r\n", timer_cnt);
     timer_index[timer_cnt] = sys_timer_add(&timer_param[timer_cnt], timer_handler, delay_s * 1000);
 
     log_info("timer set delay %d second\r\n", delay_s);
@@ -638,7 +622,7 @@ static void vendor_attr_set(struct bt_mesh_model *model,
 
         u32 delay_s = ((set_cur_utc.hour - cur_utc.hour) * 3600) + ((set_cur_utc.minute - cur_utc.minute) * 60) + (set_cur_utc.second - cur_utc.second);
 
-        printf("\n  delay_s = %d, switch set to %d\n", delay_s, attr_para);
+        log_info("\n  delay_s = %d, switch set to %d\n", delay_s, attr_para);
 
         set_timer_start(tid, delay_s, index, attr_para);
 
@@ -679,8 +663,8 @@ static void vendor_attr_set(struct bt_mesh_model *model,
                 .attr_para = attr_para,
             },
         };
-        printf("\n  time = 0x%x\n", _24h_timer);
-        printf("\n          set_period opcode = 0x%x, Attr_Type = 0x%x, para = 0x%x, index = 0x%x       \n", set_period_timeout.Opcode, Attr_Type, attr_para, index);
+        log_info("\n  time = 0x%x\n", _24h_timer);
+        log_info("\n          set_period opcode = 0x%x, Attr_Type = 0x%x, para = 0x%x, index = 0x%x       \n", set_period_timeout.Opcode, Attr_Type, attr_para, index);
         vendor_attr_status_send(model, ctx, &set_period_timeout, sizeof(set_period_timeout));
     }
     break;
@@ -693,7 +677,7 @@ static void vendor_attr_set(struct bt_mesh_model *model,
             .Attr_Type = Attr_Type,
             .index = index,
         };
-        printf("delete timeout for index = 0x%x\r\n", index);
+        log_info("delete timeout for index = 0x%x\r\n", index);
         vendor_attr_status_send(model, ctx, &delete_time, sizeof(delete_time));
     }
     break;
@@ -708,10 +692,10 @@ static void vendor_attr_set(struct bt_mesh_model *model,
         };
 
         if (level > 5) {
-            printf("max level = 5\n");
+            log_info("max level = 5\n");
             level = 5;
         }
-        printf("fan level set to %d\r\n", level);
+        log_info("fan level set to %d\r\n", level);
 
         set_led_duty(level * 2000);
 
@@ -720,7 +704,7 @@ static void vendor_attr_set(struct bt_mesh_model *model,
     break;
 
     default :
-        printf("\n\n\n\n      default attr = 0x%x \n\n\n\n", Attr_Type);
+        log_info("\n\n\n\n      default attr = 0x%x \n\n\n\n", Attr_Type);
         break;
     }
 
@@ -756,7 +740,7 @@ static const struct bt_mesh_model_op vendor_srv_op[] = {
  */
 /*-----------------------------------------------------------*/
 static struct bt_mesh_model root_models[] = {
-    BT_MESH_MODEL_CFG_SRV(&cfg_srv),
+    BT_MESH_MODEL_CFG_SRV,
     BT_MESH_MODEL(BT_MESH_MODEL_ID_GEN_ONOFF_SRV, gen_onoff_srv_op, &gen_onoff_pub_srv, &onoff_state[0]),
 };
 
@@ -898,6 +882,7 @@ static bool server_publish(struct _switch *sw)
      * must be configured to either publish to the led's unicast
      * address or a group to which the led is subscribed.
      */
+    u16 primary_addr = get_primary_addr();
     if (primary_addr == BT_MESH_ADDR_UNASSIGNED) {
         NET_BUF_SIMPLE_DEFINE(msg, 1);
         struct bt_mesh_msg_ctx ctx = {
@@ -937,7 +922,7 @@ void led_set(void)
     log_info("state set to %d, indicate_tid now = %d\r\n", led_flag, indicate_tid);
 
     if (!bt_mesh_is_provisioned()) {
-        printf("no provision, not send state indicate\r\n");
+        log_info("no provision, not send state indicate\r\n");
         return;
     }
     struct bt_mesh_msg_ctx ctx = {
@@ -1100,7 +1085,7 @@ static void aligenie_sub_set(struct bt_mesh_model *mod, u16_t sub_addr)
 
     if (i != ARRAY_SIZE(mod->groups)) {
         if (IS_ENABLED(CONFIG_BT_SETTINGS)) {
-            bt_mesh_store_mod_sub(mod);
+            bt_mesh_model_sub_store(mod);
         }
         if (IS_ENABLED(CONFIG_BT_MESH_LOW_POWER)) {
             bt_mesh_lpn_group_add(sub_addr);
@@ -1126,13 +1111,17 @@ static void mesh_init(void)
 
     static_auth_value_calculate();
 
+    bt_conn_cb_register(bt_conn_get_callbacks());
+
     int err = bt_mesh_init(&prov, &composition);
     if (err) {
         log_error("Initializing mesh failed (err %d)\n", err);
         return;
     }
 
-    settings_load();
+    if (IS_ENABLED(CONFIG_BT_SETTINGS)) {
+        settings_load();
+    }
 
     bt_mesh_prov_enable(BT_MESH_PROV_GATT | BT_MESH_PROV_ADV);
 
@@ -1141,7 +1130,7 @@ static void mesh_init(void)
 #elif defined (CONFIG_CPU_BR25)
     timer_pwm_init(JL_TIMER5, 10000, 0, IO_PORTB_07, 0);
 #else
-    printf("\nThis board had not set up timer_pwm\n");
+    log_info("\nThis board had not set up timer_pwm\n");
 #endif
 
     mesh_app_key_add_callback_register(aligenie_app_key_set);
@@ -1160,5 +1149,5 @@ void bt_ble_init(void)
     mesh_setup(mesh_init);
 }
 
-#endif /* (CONFIG_MESH_MODEL == SIG_MESH_ALIGENIE_SOCKET) */
+#endif /* (CONFIG_MESH_MODEL == SIG_MESH_ALIGENIE_FAN) */
 

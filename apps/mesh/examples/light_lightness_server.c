@@ -21,16 +21,6 @@
 #include "debug.h"
 
 #if (CONFIG_MESH_MODEL == SIG_MESH_LIGHT_LIGHTNESS_SERVER)
-
-extern u16_t primary_addr;
-extern void mesh_setup(void (*init_cb)(void));
-extern void gpio_pin_write(u8_t led_index, u8_t onoff);
-extern void bt_mac_addr_set(u8 *bt_addr);
-extern void prov_complete(u16_t net_idx, u16_t addr);
-extern void prov_reset(void);
-extern uint32_t btctler_get_rand_from_assign_range(uint32_t rand, uint32_t min, uint32_t max);
-extern void pseudo_random_genrate(uint8_t *dest, unsigned size);
-extern void ble_bqb_test_thread_init(void);
 /**
  * @brief Config current node features(Relay/Proxy/Friend/Low Power)
  */
@@ -74,7 +64,7 @@ void get_mesh_adv_name(u8 *len, u8 **data)
  * @brief Conifg MAC of current demo
  */
 /*-----------------------------------------------------------*/
-#define CUR_DEVICE_MAC_ADDR         0x222233445566
+#define CUR_DEVICE_MAC_ADDR         0x222233445569
 
 /*
  * Publication Declarations
@@ -113,22 +103,11 @@ static struct onoff_state {
     u8_t led_gpio_pin;
 };
 
-/*
- * Server Configuration Declaration
- */
-static struct bt_mesh_cfg_srv cfg_srv = {
-    .relay          = BT_MESH_FEATURES_GET(BT_MESH_FEAT_RELAY),
-    .frnd           = BT_MESH_FEATURES_GET(BT_MESH_FEAT_FRIEND),
-    .gatt_proxy     = BT_MESH_FEATURES_GET(BT_MESH_FEAT_PROXY),
-    .beacon         = BT_MESH_BEACON_DISABLED,
-    .default_ttl    = 7,
-};
-
 extern const struct bt_mesh_model_op gen_onpowerup_srv_op[];
 extern const struct bt_mesh_model_op gen_onpowerup_setup_srv_op[];
-extern const struct bt_mesh_model_op light_lightness_srv_op[];
-extern const struct bt_mesh_model_op light_lightness_setup_srv_op[];
-extern const struct bt_mesh_model_op gen_level_server[];
+extern const struct bt_mesh_model_op _bt_mesh_lightness_srv_op[];
+extern const struct bt_mesh_model_op _bt_mesh_lightness_setup_srv_op[];
+extern const struct bt_mesh_model_op _bt_mesh_lvl_srv_op[];
 extern const struct bt_mesh_model_op gen_onoff_srv_op[];
 extern const struct bt_mesh_model_op gen_onoff_cli_op[];
 
@@ -144,13 +123,13 @@ extern struct onpowerup_state dev_onpowerup_state;
  * Element 0 Root Models
  */
 struct bt_mesh_model root_models[] = {
-    BT_MESH_MODEL_CFG_SRV(&cfg_srv),
+    BT_MESH_MODEL_CFG_SRV,
     BT_MESH_MODEL(BT_MESH_MODEL_ID_GEN_ONOFF_SRV, 			  gen_onoff_srv_op, 		  	&gen_onoff_pub_srv, &dev_onoff_state[0]),
     BT_MESH_MODEL(BT_MESH_MODEL_ID_GEN_ONOFF_CLI, 			  gen_onoff_cli_op, 		  	&gen_onoff_pub_srv, &dev_onoff_state[0]),
-    BT_MESH_MODEL(BT_MESH_MODEL_ID_GEN_LEVEL_SRV, 	  		  gen_level_server, 			&gen_onoff_pub_srv, &light_level_state),
-    //BT_MESH_MODEL(BT_MESH_MODEL_ID_GEN_POWER_ONOFF_SRV, 	  gen_onpowerup_srv_op, 	  	&gen_onoff_pub_srv, &dev_onpowerup_state),
-    BT_MESH_MODEL(BT_MESH_MODEL_ID_LIGHT_LIGHTNESS_SRV, 	  light_lightness_srv_op,		&gen_onoff_pub_srv, &dev_light_state),
-    BT_MESH_MODEL(BT_MESH_MODEL_ID_LIGHT_LIGHTNESS_SETUP_SRV, light_lightness_setup_srv_op, &gen_onoff_pub_srv, &dev_light_state),
+    BT_MESH_MODEL(BT_MESH_MODEL_ID_GEN_LEVEL_SRV, 	  		  _bt_mesh_lvl_srv_op, 			&gen_onoff_pub_srv, &light_level_state),
+    BT_MESH_MODEL(BT_MESH_MODEL_ID_GEN_POWER_ONOFF_SRV, 	  gen_onpowerup_srv_op, 	  	&gen_onoff_pub_srv, &dev_onpowerup_state),
+    BT_MESH_MODEL(BT_MESH_MODEL_ID_LIGHT_LIGHTNESS_SRV, 	  _bt_mesh_lightness_srv_op,		&gen_onoff_pub_srv, &dev_light_state),
+    BT_MESH_MODEL(BT_MESH_MODEL_ID_LIGHT_LIGHTNESS_SETUP_SRV, _bt_mesh_lightness_setup_srv_op, &gen_onoff_pub_srv, &dev_light_state),
 };
 
 /*
@@ -189,13 +168,17 @@ static void mesh_init(void)
 {
     log_info("--func=%s", __FUNCTION__);
 
+    bt_conn_cb_register(bt_conn_get_callbacks());
+
     int err = bt_mesh_init(&prov, &composition);
     if (err) {
         log_error("Initializing mesh failed (err %d)\n", err);
         return;
     }
 
-    settings_load();
+    if (IS_ENABLED(CONFIG_BT_SETTINGS)) {
+        settings_load();
+    }
 
     bt_mesh_prov_enable(BT_MESH_PROV_GATT | BT_MESH_PROV_ADV);
 }
@@ -224,4 +207,4 @@ void bt_ble_init(void)
 #endif
 }
 
-#endif /* (CONFIG_MESH_MODEL == SIG_MESH_GENERIC_ONOFF_SERVER) */
+#endif /* (CONFIG_MESH_MODEL == SIG_MESH_LIGHT_LIGHTNESS_SERVER) */

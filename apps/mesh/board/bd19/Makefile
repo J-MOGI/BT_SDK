@@ -89,6 +89,7 @@ CFLAGS := \
 	-Wframe-larger-than=256 \
 	-Wreturn-type \
 	-Wimplicit-function-declaration \
+	-Werror=jl-arg-struct-check \
 	-fms-extensions \
 
 
@@ -119,8 +120,8 @@ DEFINES := \
 	-DCONFIG_EVENT_KEY_MAP_ENABLE=0 \
 	-DTIMER_POOL_NUM_CONFIG=10 \
 	-DAPP_ASYNC_POOL_NUM_CONFIG=0 \
-	-DSDK_VERSION_CFG_DEFINE=0x230003 \
-	-DSDK_VERSION_DATE_DEFINE=20240331 \
+	-DSDK_VERSION_CFG_DEFINE=0x240001 \
+	-DSDK_VERSION_DATE_DEFINE=20241231 \
 	-DVFS_ENABLE=1 \
 	-DUSE_SDFILE_NEW=1 \
 	-DVFS_FILE_POOL_NUM_CONFIG=0 \
@@ -179,6 +180,7 @@ INCLUDES := \
 	-I../../../../apps/common/third_party_profile/common \
 	-I../../../../apps/common/third_party_profile/jieli/JL_rcsp/rcsp_updata \
 	-I../../../../apps/common/third_party_profile/jieli/JL_rcsp \
+	-I../../../../apps/common/third_party_profile/jieli/JL_rcsp/bt_trans_data \
 	-I../../../../apps/common/third_party_profile/jieli/gatt_common \
 	-I../../../../apps/common/third_party_profile/jieli \
 	-I../../../../include_lib/system/os/FreeRTOS \
@@ -192,6 +194,8 @@ INCLUDES := \
 	-I../../../../apps/common/third_party_profile/sig_mesh/tinycrypt/include \
 	-I../../../../apps/common/third_party_profile/sig_mesh/adaptation \
 	-I../../../../apps/mesh/api \
+	-I../../../../apps/mesh/mesh_dfu \
+	-I../../../../apps/mesh/MshMDL \
 	-I$(SYS_INC_DIR) \
 
 
@@ -228,33 +232,96 @@ c_SRC_FILES := \
 	../../../../apps/common/third_party_profile/sig_mesh/adaptation/storage.c \
 	../../../../apps/common/third_party_profile/sig_mesh/adaptation/utils.c \
 	../../../../apps/common/third_party_profile/sig_mesh/adv.c \
+	../../../../apps/common/third_party_profile/sig_mesh/adv_ext.c \
+	../../../../apps/common/third_party_profile/sig_mesh/adv_legacy.c \
 	../../../../apps/common/third_party_profile/sig_mesh/api/sig_mesh_api.c \
+	../../../../apps/common/third_party_profile/sig_mesh/app_keys.c \
 	../../../../apps/common/third_party_profile/sig_mesh/beacon.c \
+	../../../../apps/common/third_party_profile/sig_mesh/blob_cli.c \
+	../../../../apps/common/third_party_profile/sig_mesh/blob_io_flash.c \
+	../../../../apps/common/third_party_profile/sig_mesh/blob_srv.c \
 	../../../../apps/common/third_party_profile/sig_mesh/cdb.c \
+	../../../../apps/common/third_party_profile/sig_mesh/cfg.c \
 	../../../../apps/common/third_party_profile/sig_mesh/cfg_cli.c \
 	../../../../apps/common/third_party_profile/sig_mesh/cfg_srv.c \
 	../../../../apps/common/third_party_profile/sig_mesh/crypto.c \
+	../../../../apps/common/third_party_profile/sig_mesh/crypto_psa.c \
+	../../../../apps/common/third_party_profile/sig_mesh/crypto_tc.c \
+	../../../../apps/common/third_party_profile/sig_mesh/delayable_msg.c \
+	../../../../apps/common/third_party_profile/sig_mesh/dfd_srv.c \
+	../../../../apps/common/third_party_profile/sig_mesh/dfu_cli.c \
+	../../../../apps/common/third_party_profile/sig_mesh/dfu_metadata.c \
+	../../../../apps/common/third_party_profile/sig_mesh/dfu_slot.c \
+	../../../../apps/common/third_party_profile/sig_mesh/dfu_srv.c \
 	../../../../apps/common/third_party_profile/sig_mesh/friend.c \
+	../../../../apps/common/third_party_profile/sig_mesh/gatt_cli.c \
 	../../../../apps/common/third_party_profile/sig_mesh/health_cli.c \
 	../../../../apps/common/third_party_profile/sig_mesh/health_srv.c \
+	../../../../apps/common/third_party_profile/sig_mesh/heartbeat.c \
+	../../../../apps/common/third_party_profile/sig_mesh/large_comp_data_cli.c \
+	../../../../apps/common/third_party_profile/sig_mesh/large_comp_data_srv.c \
 	../../../../apps/common/third_party_profile/sig_mesh/lpn.c \
 	../../../../apps/common/third_party_profile/sig_mesh/main.c \
+	../../../../apps/common/third_party_profile/sig_mesh/msg.c \
 	../../../../apps/common/third_party_profile/sig_mesh/net.c \
 	../../../../apps/common/third_party_profile/sig_mesh/net/buf.c \
+	../../../../apps/common/third_party_profile/sig_mesh/od_priv_proxy_cli.c \
+	../../../../apps/common/third_party_profile/sig_mesh/od_priv_proxy_srv.c \
+	../../../../apps/common/third_party_profile/sig_mesh/op_agg.c \
+	../../../../apps/common/third_party_profile/sig_mesh/op_agg_cli.c \
+	../../../../apps/common/third_party_profile/sig_mesh/op_agg_srv.c \
+	../../../../apps/common/third_party_profile/sig_mesh/pb_adv.c \
+	../../../../apps/common/third_party_profile/sig_mesh/pb_gatt.c \
+	../../../../apps/common/third_party_profile/sig_mesh/pb_gatt_cli.c \
+	../../../../apps/common/third_party_profile/sig_mesh/pb_gatt_srv.c \
+	../../../../apps/common/third_party_profile/sig_mesh/priv_beacon_cli.c \
+	../../../../apps/common/third_party_profile/sig_mesh/priv_beacon_srv.c \
 	../../../../apps/common/third_party_profile/sig_mesh/prov.c \
-	../../../../apps/common/third_party_profile/sig_mesh/proxy.c \
+	../../../../apps/common/third_party_profile/sig_mesh/provisionee.c \
+	../../../../apps/common/third_party_profile/sig_mesh/provisioner.c \
+	../../../../apps/common/third_party_profile/sig_mesh/proxy_cli.c \
+	../../../../apps/common/third_party_profile/sig_mesh/proxy_msg.c \
+	../../../../apps/common/third_party_profile/sig_mesh/proxy_srv.c \
+	../../../../apps/common/third_party_profile/sig_mesh/rpl.c \
+	../../../../apps/common/third_party_profile/sig_mesh/rpr_cli.c \
+	../../../../apps/common/third_party_profile/sig_mesh/rpr_srv.c \
+	../../../../apps/common/third_party_profile/sig_mesh/sar_cfg.c \
+	../../../../apps/common/third_party_profile/sig_mesh/sar_cfg_cli.c \
+	../../../../apps/common/third_party_profile/sig_mesh/sar_cfg_srv.c \
 	../../../../apps/common/third_party_profile/sig_mesh/settings.c \
+	../../../../apps/common/third_party_profile/sig_mesh/sol_pdu_rpl_cli.c \
+	../../../../apps/common/third_party_profile/sig_mesh/sol_pdu_rpl_srv.c \
+	../../../../apps/common/third_party_profile/sig_mesh/solicitation.c \
+	../../../../apps/common/third_party_profile/sig_mesh/statistic.c \
+	../../../../apps/common/third_party_profile/sig_mesh/subnet.c \
 	../../../../apps/common/third_party_profile/sig_mesh/tinycrypt/source/aes_encrypt.c \
 	../../../../apps/common/third_party_profile/sig_mesh/tinycrypt/source/cmac_mode.c \
 	../../../../apps/common/third_party_profile/sig_mesh/tinycrypt/source/utils.c \
 	../../../../apps/common/third_party_profile/sig_mesh/transport.c \
+	../../../../apps/common/third_party_profile/sig_mesh/va.c \
 	../../../../apps/common/update/testbox_update.c \
 	../../../../apps/common/update/update.c \
-	../../../../apps/mesh/MshMDL/generic_level_srv.c \
+	../../../../apps/mesh/MshMDL/dfu_dist.c \
+	../../../../apps/mesh/MshMDL/dfu_target.c \
+	../../../../apps/mesh/MshMDL/gen_dtt_srv.c \
+	../../../../apps/mesh/MshMDL/gen_lvl_cli.c \
+	../../../../apps/mesh/MshMDL/gen_lvl_srv.c \
+	../../../../apps/mesh/MshMDL/gen_onoff_srv.c \
+	../../../../apps/mesh/MshMDL/gen_ponoff_srv.c \
 	../../../../apps/mesh/MshMDL/generic_onoff_cli.c \
 	../../../../apps/mesh/MshMDL/generic_onoff_srv.c \
 	../../../../apps/mesh/MshMDL/generic_power_onoff_srv.c \
+	../../../../apps/mesh/MshMDL/light_ctrl_reg.c \
+	../../../../apps/mesh/MshMDL/light_ctrl_srv.c \
+	../../../../apps/mesh/MshMDL/lightness_cli.c \
 	../../../../apps/mesh/MshMDL/lightness_srv.c \
+	../../../../apps/mesh/MshMDL/model_utils.c \
+	../../../../apps/mesh/MshMDL/scene_cli.c \
+	../../../../apps/mesh/MshMDL/scene_srv.c \
+	../../../../apps/mesh/MshMDL/sensor.c \
+	../../../../apps/mesh/MshMDL/sensor_cli.c \
+	../../../../apps/mesh/MshMDL/sensor_srv.c \
+	../../../../apps/mesh/MshMDL/sensor_types.c \
 	../../../../apps/mesh/api/mesh_config_common.c \
 	../../../../apps/mesh/api/model_api.c \
 	../../../../apps/mesh/api/unix_timestamp.c \
@@ -269,14 +336,25 @@ c_SRC_FILES := \
 	../../../../apps/mesh/board/bd19/board_ac6329e_demo.c \
 	../../../../apps/mesh/board/bd19/board_ac6329f_demo.c \
 	../../../../apps/mesh/board/bd19/board_ac632n_demo.c \
+	../../../../apps/mesh/board/bd19/board_ac632n_distributor.c \
+	../../../../apps/mesh/board/bd19/board_ac632n_target_node.c \
 	../../../../apps/mesh/examples/AliGenie_fan.c \
 	../../../../apps/mesh/examples/AliGenie_light.c \
 	../../../../apps/mesh/examples/AliGenie_socket.c \
 	../../../../apps/mesh/examples/TUYA_light.c \
+	../../../../apps/mesh/examples/ambient_light_sensor_nlc.c \
+	../../../../apps/mesh/examples/basic_lightness_ctrl_nlc.c \
+	../../../../apps/mesh/examples/basic_scene_selector_nlc.c \
+	../../../../apps/mesh/examples/dfu_distributor_demo.c \
+	../../../../apps/mesh/examples/dfu_target_demo.c \
+	../../../../apps/mesh/examples/dimming_control_nlc.c \
+	../../../../apps/mesh/examples/energy_monitor_nlc.c \
 	../../../../apps/mesh/examples/generic_onoff_client.c \
 	../../../../apps/mesh/examples/generic_onoff_server.c \
 	../../../../apps/mesh/examples/light_lightness_server.c \
-	../../../../apps/mesh/examples/onoff_tobe_provision.c \
+	../../../../apps/mesh/examples/light_occupacy_observer_nlc.c \
+	../../../../apps/mesh/examples/light_occupacy_sensor_nlc.c \
+	../../../../apps/mesh/examples/provisionee.c \
 	../../../../apps/mesh/examples/provisioner.c \
 	../../../../apps/mesh/examples/tencent_mesh.c \
 	../../../../apps/mesh/examples/vendor_client.c \
@@ -289,6 +367,9 @@ c_SRC_FILES := \
 	../../../../apps/mesh/lib_config/lib_system_config.c \
 	../../../../apps/mesh/lib_config/lib_update_config.c \
 	../../../../apps/mesh/log_config.c \
+	../../../../apps/mesh/mesh_dfu/mesh_dfu_app_cmd_protocol.c \
+	../../../../apps/mesh/mesh_dfu/mesh_distributor_loader.c \
+	../../../../apps/mesh/mesh_dfu/mesh_target_node_ota.c \
 	../../../../apps/mesh/user_cfg.c \
 	../../../../apps/mesh/version.c \
 	../../../../cpu/bd19/adc_api.c \

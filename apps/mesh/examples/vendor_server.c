@@ -11,6 +11,7 @@
 #include "bt_common.h"
 #include "api/sig_mesh_api.h"
 #include "model_api.h"
+#include "feature_correct.h"
 
 #define LOG_TAG         "[Mesh-vendor_srv]"
 #define LOG_INFO_ENABLE
@@ -21,26 +22,28 @@
 
 #if (CONFIG_MESH_MODEL == SIG_MESH_VENDOR_SERVER)
 
-extern u16_t primary_addr;
-extern void mesh_setup(void (*init_cb)(void));
-extern void gpio_pin_write(u8_t led_index, u8_t onoff);
-extern void bt_mac_addr_set(u8 *bt_addr);
-extern void prov_complete(u16_t net_idx, u16_t addr);
-extern void prov_reset(void);
-static void vendor_set(struct bt_mesh_model *model,
-                       struct bt_mesh_msg_ctx *ctx,
-                       struct net_buf_simple *buf);
-
-#define SERVER_PUBLISH_EN       0
-
+#define SERVER_PUBLISH_EN      0
 /**
  * @brief Config current node features(Relay/Proxy/Friend/Low Power)
  */
 /*-----------------------------------------------------------*/
 #define BT_MESH_FEAT_SUPPORTED_TEMP         ( \
+                                                BT_MESH_FEAT_RELAY | \
+                                                BT_MESH_FEAT_PROXY | \
                                                 0 \
                                             )
-#include "feature_correct.h"
+/**
+ * @brief Conifg complete local name
+ */
+/*-----------------------------------------------------------*/
+#define BLE_DEV_NAME        'V', 'd', '_','s', 'r', 'v'
+
+/**
+ * @brief Conifg MAC of current demo
+ */
+/*-----------------------------------------------------------*/
+#define CUR_DEVICE_MAC_ADDR         0x442233445566
+
 const int config_bt_mesh_features = BT_MESH_FEAT_SUPPORTED;
 
 /**
@@ -62,36 +65,6 @@ const u8 config_bt_mesh_adv_buf_count = MESH_ADV_BUFFER_COUNT;
 #if (MESH_ADV_BUFFER_COUNT < 4) // base on "config_bt_mesh_node_msg_adv_duration = 100"
 #error " current MESH_ADV_BUFFER_COUNT must >= 4 "
 #endif
-
-/**
- * @brief Conifg complete local name
- */
-/*-----------------------------------------------------------*/
-#define BLE_DEV_NAME        'V', 'd', '_','s', 'r', 'v'
-
-const uint8_t mesh_name[] = {
-    // Name
-    BYTE_LEN(BLE_DEV_NAME) + 1, BLUETOOTH_DATA_TYPE_COMPLETE_LOCAL_NAME, BLE_DEV_NAME,
-};
-
-void get_mesh_adv_name(u8 *len, u8 **data)
-{
-    *len = sizeof(mesh_name);
-
-    *data = mesh_name;
-}
-
-/**
- * @brief Conifg MAC of current demo
- */
-/*-----------------------------------------------------------*/
-#define CUR_DEVICE_MAC_ADDR         0x442233445566
-
-struct _switch {
-    u8_t sw_num;
-    u8_t onoff_state;
-};
-
 /* Company Identifiers (see Bluetooth Assigned Numbers) */
 #define BT_COMP_ID_LF           0x05D6 // Zhuhai Jieli technology Co.,Ltd
 
@@ -124,22 +97,6 @@ struct _switch {
 
 /* LED NUMBER */
 #define LED0_GPIO_PIN       0
-
-struct onoff_state {
-    u8_t onoff;
-    u8_t led_gpio_pin;
-};
-
-static struct onoff_state onoff_state[] = {
-    { .led_gpio_pin = LED0_GPIO_PIN },
-};
-
-const u8 led_use_port[1] = {
-
-    IO_PORTA_01,
-
-};
-
 /*
  * Publication Declarations
  *
@@ -158,6 +115,65 @@ const u8 led_use_port[1] = {
  */
 BT_MESH_MODEL_PUB_DEFINE(vendor_pub_srv, NULL, MAX_USEFUL_ACCESS_PAYLOAD_SIZE);
 
+#define NODE_ADDR 0x0002
+#define GROUP_ADDR 0xc000
+#define OP_VENDOR_BUTTON BT_MESH_MODEL_OP_3(0x00, BT_COMP_ID_LF)
+
+struct _switch {
+    u8_t sw_num;
+    u8_t onoff_state;
+};
+
+struct onoff_state {
+    u8_t onoff;
+    u8_t led_gpio_pin;
+};
+
+static void vendor_set(struct bt_mesh_model *model,
+                       struct bt_mesh_msg_ctx *ctx,
+                       struct net_buf_simple *buf);
+
+static const u16_t net_idx;
+static const u16_t app_idx;
+static const u32_t iv_index;
+static u8_t flags;
+static u16_t node_addr = NODE_ADDR;
+
+static const u8_t net_key[16] = {
+    0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
+    0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
+};
+
+static const u8_t dev_key[16] = {
+    0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
+    0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
+};
+
+static const u8_t app_key[16] = {
+    0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
+    0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
+};
+
+const uint8_t mesh_name[] = {
+    // Name
+    BYTE_LEN(BLE_DEV_NAME) + 1, BLUETOOTH_DATA_TYPE_COMPLETE_LOCAL_NAME, BLE_DEV_NAME,
+};
+
+void get_mesh_adv_name(u8 *len, u8 **data)
+{
+    *len = sizeof(mesh_name);
+
+    *data = mesh_name;
+}
+
+static struct onoff_state onoff_state[] = {
+    { .led_gpio_pin = LED0_GPIO_PIN },
+};
+
+const u8 led_use_port[1] = {
+    IO_PORTA_01,
+};
+
 /*
  * Models in an element must have unique op codes.
  *
@@ -175,17 +191,6 @@ static const struct bt_mesh_model_op vendor_srv_op[] = {
 };
 
 /*
- * Server Configuration Declaration
- */
-static struct bt_mesh_cfg_srv cfg_srv = {
-    .relay          = BT_MESH_FEATURES_GET(BT_MESH_FEAT_RELAY),
-    .frnd           = BT_MESH_FEATURES_GET(BT_MESH_FEAT_FRIEND),
-    .gatt_proxy     = BT_MESH_FEATURES_GET(BT_MESH_FEAT_PROXY),
-    .beacon         = BT_MESH_BEACON_DISABLED,
-    .default_ttl    = 7,
-};
-
-/*
  * Client Configuration Declaration
  */
 static struct bt_mesh_cfg_cli cfg_cli;
@@ -197,7 +202,7 @@ static struct bt_mesh_cfg_cli cfg_cli;
  * Element 0 Root Models
  */
 static struct bt_mesh_model root_models[] = {
-    BT_MESH_MODEL_CFG_SRV(&cfg_srv), // default for root model
+    BT_MESH_MODEL_CFG_SRV,// default for root model
     BT_MESH_MODEL_CFG_CLI(&cfg_cli), // default for self-configuration network
 };
 
@@ -245,12 +250,12 @@ static void vendor_set(struct bt_mesh_model *model,
     log_info_hexdump(buf->data, buf->len);
 
     struct net_buf_simple *msg = model->pub->msg;
-    struct onoff_state *onoff_state = model->user_data;
+    struct onoff_state *onoff_state = model->rt->user_data;
 
     //< set led onoff
     onoff_state->onoff = buffer_pull_u8_from_head(buf);
     log_info("Local Node 0x%02x shoult set led to 0x%02x\n",
-             bt_mesh_model_elem(model)->addr, onoff_state->onoff);
+             bt_mesh_model_elem(model)->rt->addr, onoff_state->onoff);
     gpio_pin_write(onoff_state->led_gpio_pin, onoff_state->onoff);
 
     //< Ack to client with the same receive data
@@ -308,44 +313,9 @@ static void button_pressed_worker(struct _switch *sw)
 }
 #endif /* SERVER_PUBLISH_EN */
 
-#define NODE_ADDR 0x0002
-
-#define GROUP_ADDR 0xc000
-
-#define OP_VENDOR_BUTTON BT_MESH_MODEL_OP_3(0x00, BT_COMP_ID_LF)
-
-static const u8_t net_key[16] = {
-    0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
-    0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
-};
-
-static const u8_t dev_key[16] = {
-    0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
-    0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
-};
-
-static const u8_t app_key[16] = {
-    0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
-    0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
-};
-
-static const u16_t net_idx;
-static const u16_t app_idx;
-static const u32_t iv_index;
-static u8_t flags;
-static u16_t node_addr = NODE_ADDR;
-
-static void configure(void)
+void bind_mode_mod_sub_set()
 {
-    log_info("Configuring...");
-
     u16_t elem_addr = node_addr;
-    log_info("node_addr=0x%x, net_idx=0x%x, app_idx=0x%x", node_addr, net_idx, app_idx);
-
-    /* Add Application Key */
-    log_info("bt_mesh_cfg_app_key_add");
-    bt_mesh_cfg_app_key_add(net_idx, node_addr, net_idx, app_idx, app_key, NULL);
-
     u16 dst_addr = GROUP_ADDR;
 
     /* Bind to vendor server model */
@@ -364,7 +334,7 @@ static void configure(void)
 
 #if SERVER_PUBLISH_EN
     /* Add model publish */
-    struct bt_mesh_cfg_mod_pub pub;
+    struct bt_mesh_cfg_cli_mod_pub pub;
     pub.addr = dst_addr;
     pub.app_idx = app_idx;
     pub.cred_flag = 0;
@@ -378,6 +348,21 @@ static void configure(void)
                                 BT_COMP_ID_LF,
                                 &pub, NULL);
 #endif /* SERVER_PUBLISH_EN */
+
+}
+
+static void configure(void)
+{
+    log_info("Configuring...");
+
+    log_info("node_addr=0x%x, net_idx=0x%x, app_idx=0x%x", node_addr, net_idx, app_idx);
+
+    /* Add Application Key */
+    log_info("bt_mesh_cfg_cli_app_key_add");
+    bt_mesh_cfg_cli_app_key_add(net_idx, node_addr, net_idx, app_idx, app_key, NULL);
+
+    /* Bind to vendor server model should be tasked until app key add*/
+    sys_timeout_add(NULL, bind_mode_mod_sub_set, 100);
 
     log_info("Configuration complete");
 }
@@ -416,13 +401,16 @@ void input_key_handler(u8 key_status, u8 key_number)
 
 static void mesh_init(void)
 {
+    bt_conn_cb_register(bt_conn_get_callbacks());
     int err = bt_mesh_init(&prov, &composition);
     if (err) {
         log_error("Initializing mesh failed (err %d)\n", err);
         return;
     }
 
-    settings_load();
+    if (IS_ENABLED(CONFIG_BT_SETTINGS)) {
+        settings_load();
+    }
 
     err = bt_mesh_provision(net_key, net_idx, flags, iv_index, node_addr, dev_key);
     if (err) {
@@ -433,7 +421,6 @@ static void mesh_init(void)
         configure();
     }
 }
-
 
 void bt_ble_init(void)
 {

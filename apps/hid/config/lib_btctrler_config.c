@@ -158,23 +158,35 @@ const int config_btctler_coded_type = CONN_SET_PHY_OPTIONS_S2;
 #if CONFIG_BT_GATT_SERVER_NUM
 #define SET_SLAVE_ROLS_CFG   (LE_ADV | LE_SLAVE)
 // Slave multi-link
-const int config_btctler_le_slave_multilink = (CONFIG_BT_GATT_SERVER_NUM > 1);
 #else
 #define SET_SLAVE_ROLS_CFG   0
 // Slave multi-link
-const int config_btctler_le_slave_multilink = 0;
 #endif
 
 #if CONFIG_BT_GATT_CLIENT_NUM
 #define SET_MASTER_ROLS_CFG   (LE_SCAN | LE_INIT | LE_MASTER)
 const int config_btctler_le_afh_en = 1;
 // Master + Slave multi-link
-const int config_btctler_le_master_multilink = (CONFIG_BT_GATT_CLIENT_NUM + CONFIG_BT_GATT_SERVER_NUM) ? 1 : 0;
 #else
 #define SET_MASTER_ROLS_CFG   0
 const int config_btctler_le_afh_en = 0;
+#endif
+
+// multi-link config, 带主从多机只开slave_multilink就可以
+#if (CONFIG_BT_GATT_SERVER_NUM > 1)
+const int config_btctler_le_slave_multilink = 1;
+const int config_btctler_le_master_multilink = 0;
+#elif (CONFIG_BT_GATT_SERVER_NUM && CONFIG_BT_GATT_CLIENT_NUM)
+const int config_btctler_le_slave_multilink = 1;
+const int config_btctler_le_master_multilink = 0;
+#elif (CONFIG_BT_GATT_CLIENT_NUM > 1)
+const int config_btctler_le_slave_multilink = 0;
+const int config_btctler_le_master_multilink = 1;
+#else
+const int config_btctler_le_slave_multilink = 0;
 const int config_btctler_le_master_multilink = 0;
 #endif
+
 
 #if CONFIG_BLE_HIGH_SPEED
 const uint64_t config_btctler_le_features = SET_ENCRYPTION_CFG | SET_SELECT_PHY_CFG | LE_DATA_PACKET_LENGTH_EXTENSION | LE_2M_PHY | EXT_ADV_CFG;

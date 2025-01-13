@@ -453,7 +453,7 @@ void board_set_soft_poweroff(void)
 
     usb_iomode(1);
 
-	gpio_set_pull_up(IO_PORT_DP, 0);
+    gpio_set_pull_up(IO_PORT_DP, 0);
     gpio_set_pull_down(IO_PORT_DP, 0);
     gpio_set_direction(IO_PORT_DP, 1);
     gpio_set_die(IO_PORT_DP, 0);
@@ -473,9 +473,21 @@ void board_set_soft_poweroff(void)
 
 }
 
+#define     APP_IO_DEBUG_0(i,x)       //{JL_PORT##i->DIR &= ~BIT(x), JL_PORT##i->OUT &= ~BIT(x);}
+#define     APP_IO_DEBUG_1(i,x)       //{JL_PORT##i->DIR &= ~BIT(x), JL_PORT##i->OUT |= BIT(x);}
+
+
+//-----------------------------------------------
 void sleep_exit_callback(u32 usec)
 {
 	putchar('>');
+    APP_IO_DEBUG_1(A, 6);
+
+	if(TCFG_LOWPOWER_POWER_SEL == PWR_DCDC15){
+		/* putchar('}'); */
+		power_set_mode(TCFG_LOWPOWER_POWER_SEL);
+	}
+
 }
 
 void sleep_enter_callback(u8  step)
@@ -483,9 +495,14 @@ void sleep_enter_callback(u8  step)
     /* 此函数禁止添加打印 */
     if (step == 1) {
 		putchar('<');
+        APP_IO_DEBUG_0(A, 6);
 #if TCFG_AUDIO_ENABLE
         dac_power_off();
 #endif/*TCFG_AUDIO_ENABLE*/
+		if(TCFG_LOWPOWER_POWER_SEL == PWR_DCDC15){
+			/* putchar('{'); */
+			power_set_mode(PWR_LDO15);
+		}
     } else {
 
         usb_iomode(1);
@@ -503,6 +520,10 @@ void sleep_enter_callback(u8  step)
         gpio_set_dieh(IO_PORT_DM, 0);
     }
 }
+
+
+//-----------------------------------------------
+
 
 void board_power_init(void)
 {

@@ -71,7 +71,12 @@ EQ_SECTION_NUM = 10+MIC_EFFECT_EQ_SECTION;
 
 MEMORY
 {
+#ifdef CONFIG_LARGE_PROGRAM_ENABLE
+	code0(rx)    	  : ORIGIN =  0x1000120,  LENGTH = CONFIG_FLASH_SIZE
+#else /* #ifdef CONFIG_LARGE_PROGRAM_ENABLE */
 	code0(rx)    	  : ORIGIN =  0x1E00120,  LENGTH = CONFIG_FLASH_SIZE
+#endif /* #ifdef CONFIG_LARGE_PROGRAM_ENABLE */
+
 	ram0(rwx)         : ORIGIN =  RAM_BEGIN, LENGTH = RAM_SIZE
 }
 
@@ -100,6 +105,17 @@ SECTIONS
         chargestore_handler_begin = .;
         KEEP(*(.chargestore_callback_txt))
         chargestore_handler_end = .;
+
+        . = ALIGN(4);
+        //mesh scene begin
+        _bt_mesh_scene_entry_sig_list_start = .;
+        KEEP(*(.bt_mesh_scene_entry_sig))
+        _bt_mesh_scene_entry_sig_list_end = .;
+
+        . = ALIGN(4);
+        _bt_mesh_scene_entry_vnd_list_start = .;
+        KEEP(*(.bt_mesh_scene_entry_vnd))
+        _bt_mesh_scene_entry_vnd_list_end = .;
 
 		/********maskrom arithmetic ****/
         *(.bfilt_code)

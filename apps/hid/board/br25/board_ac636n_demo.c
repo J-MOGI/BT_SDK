@@ -323,79 +323,6 @@ void board_init()
 	}else{
 		power_set_mode(TCFG_LOWPOWER_POWER_SEL);
 	}
-
-}
-
-
-/*进软关机之前默认将IO口都设置成高阻状态，需要保留原来状态的请修改该函数*/
-static void close_gpio(u8 is_softoff)
-{
-    u16 port_group[] = {
-        [PORTA_GROUP] = 0xffff,
-        [PORTB_GROUP] = 0xffff,
-        [PORTC_GROUP] = 0xffff,
-    };
-
-#if TCFG_ADKEY_ENABLE
-    port_protect(port_group,TCFG_ADKEY_PORT);
-#endif
-
-#if TCFG_IOKEY_ENABLE
-	port_protect(port_group, TCFG_IOKEY_POWER_ONE_PORT);
-    port_protect(port_group, TCFG_IOKEY_PREV_ONE_PORT);
-    port_protect(port_group, TCFG_IOKEY_NEXT_ONE_PORT);
-#endif /* TCFG_IOKEY_ENABLE */
-
-#if TCFG_CHARGE_ENABLE && TCFG_HANDSHAKE_ENABLE
-    if (is_softoff == 0) {
-        port_protect(port_group, TCFG_HANDSHAKE_IO_DATA1);
-        port_protect(port_group, TCFG_HANDSHAKE_IO_DATA2);
-    }
-#endif
-
-    //< close gpio
-    gpio_dir(GPIOA, 0, 16, port_group[PORTA_GROUP], GPIO_OR);
-    gpio_set_pu(GPIOA, 0, 16, ~port_group[PORTA_GROUP], GPIO_AND);
-    gpio_set_pd(GPIOA, 0, 16, ~port_group[PORTA_GROUP], GPIO_AND);
-    gpio_die(GPIOA, 0, 16, ~port_group[PORTA_GROUP], GPIO_AND);
-    gpio_dieh(GPIOA, 0, 16, ~port_group[PORTA_GROUP], GPIO_AND);
-
-    gpio_dir(GPIOB, 0, 16, port_group[PORTB_GROUP], GPIO_OR);
-    gpio_set_pu(GPIOB, 0, 16, ~port_group[PORTB_GROUP], GPIO_AND);
-    gpio_set_pd(GPIOB, 0, 16, ~port_group[PORTB_GROUP], GPIO_AND);
-    gpio_die(GPIOB, 0, 16, ~port_group[PORTB_GROUP], GPIO_AND);
-    gpio_dieh(GPIOB, 0, 16, ~port_group[PORTB_GROUP], GPIO_AND);
-
-
-    gpio_dir(GPIOC, 0, 16, port_group[PORTC_GROUP], GPIO_OR);
-    gpio_set_pu(GPIOC, 0, 16, ~port_group[PORTC_GROUP], GPIO_AND);
-    gpio_set_pd(GPIOC, 0, 16, ~port_group[PORTC_GROUP], GPIO_AND);
-    gpio_die(GPIOC, 0, 16, ~port_group[PORTC_GROUP], GPIO_AND);
-    gpio_dieh(GPIOC, 0, 16, ~port_group[PORTC_GROUP], GPIO_AND);
-
-    //< close usb io
-    usb_iomode(1);
-
-	//dp dm is io_key
-	/* gpio_set_pull_up(IO_PORT_DP, 0); */
-    /* gpio_set_pull_down(IO_PORT_DP, 0); */
-    /* gpio_set_direction(IO_PORT_DP, 1); */
-    /* gpio_set_die(IO_PORT_DP, 0); */
-    /* gpio_set_dieh(IO_PORT_DP, 0); */
-
-    /* gpio_set_pull_up(IO_PORT_DM, 0); */
-    /* gpio_set_pull_down(IO_PORT_DM, 0); */
-    /* gpio_set_direction(IO_PORT_DM, 1); */
-    /* gpio_set_die(IO_PORT_DM, 0); */
-    /* gpio_set_dieh(IO_PORT_DM, 0); */
-
-    /* printf("JL_USB_IO->CON0=0x%x\r\n", JL_USB_IO->CON0); */
-    /* printf("JL_USB_IO->CON1=0x%x\r\n", JL_USB_IO->CON1); */
-    /* printf("JL_USB->CON0=0x%x\r\n", JL_USB->CON0); */
-    /*  */
-    /* printf("JL_USB1_IO->CON0=0x%x\r\n", JL_USB1_IO->CON0); */
-    /* printf("JL_USB1_IO->CON1=0x%x\r\n", JL_USB1_IO->CON1); */
-    /* printf("JL_USB1->CON0=0x%x\r\n", JL_USB1->CON0); */
 }
 
 /************************** PWR config ****************************/
@@ -578,17 +505,19 @@ void sleep_enter_callback(u8  step)
 		}
     } else {
 
-        close_gpio(0);
+        usb_iomode(1);
 
         gpio_set_pull_up(IO_PORT_DP, 0);
         gpio_set_pull_down(IO_PORT_DP, 0);
         gpio_set_direction(IO_PORT_DP, 1);
         gpio_set_die(IO_PORT_DP, 0);
+        gpio_set_dieh(IO_PORT_DP, 0);
 
         gpio_set_pull_up(IO_PORT_DM, 0);
         gpio_set_pull_down(IO_PORT_DM, 0);
         gpio_set_direction(IO_PORT_DM, 1);
         gpio_set_die(IO_PORT_DM, 0);
+        gpio_set_dieh(IO_PORT_DM, 0);
     }
 }
 
