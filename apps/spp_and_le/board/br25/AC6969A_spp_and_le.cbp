@@ -2,7 +2,7 @@
 <CodeBlocks_project_file>
 <FileVersion major="1" minor="6" />
 <Project>
-<Option title="AC636N_spp_and_le" />
+<Option title="AC6969A_spp_and_le" />
 <Option compiler="pi32v2_r3_lto_compiler" />
 <Build>
 <Target title="Release">
@@ -70,7 +70,7 @@
 <Add option="-DCONFIG_OTA_UPDATA_ENABLE" />
 <Add option="-DCONFIG_ITEM_FORMAT_VM" />
 <Add option="-DTCFG_APP_BT_EN=1" />
-<Add option="-DCONFIG_BOARD_AC636N_DEMO" />
+<Add option="-DCONFIG_BOARD_AC6969A_DEMO" />
 <Add option="-DUSB_PC_NO_APP_MODE" />
 <Add directory="../../../../include_lib" />
 <Add directory="../../../../include_lib/driver" />

@@ -5,6 +5,7 @@
 		<Project filename="apps/spp_and_le/board/bd19/AC632N_spp_and_le.cbp" />
 		<Project filename="apps/spp_and_le/board/bd29/AC631N_spp_and_le.cbp" />
 		<Project filename="apps/spp_and_le/board/br25/AC636N_spp_and_le.cbp" />
+		<Project filename="apps/spp_and_le/board/br25/AC6969A_spp_and_le.cbp" />
 		<Project filename="apps/spp_and_le/board/br30/AC637N_spp_and_le.cbp" />
 		<Project filename="apps/spp_and_le/board/br23/AC635N_spp_and_le.cbp" />
 		<Project filename="apps/hid/board/br34/AC638N_hid.cbp" />
