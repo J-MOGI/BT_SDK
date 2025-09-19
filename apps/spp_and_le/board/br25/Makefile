@@ -340,8 +340,9 @@ c_SRC_FILES := \
 	../../../../apps/common/update/update.c \
 	../../../../apps/spp_and_le/app_main.c \
 	../../../../apps/spp_and_le/board/br25/board_ac6363f_demo.c \
-	../../../../apps/spp_and_le/board/br25/board_ac6366c_demo.c \
-	../../../../apps/spp_and_le/board/br25/board_ac6368a_demo.c \
+        ../../../../apps/spp_and_le/board/br25/board_ac6366c_demo.c \
+        ../../../../apps/spp_and_le/board/br25/board_ac6969a_demo.c \
+        ../../../../apps/spp_and_le/board/br25/board_ac6368a_demo.c \
 	../../../../apps/spp_and_le/board/br25/board_ac6368b_dongle.c \
 	../../../../apps/spp_and_le/board/br25/board_ac6369c_demo.c \
 	../../../../apps/spp_and_le/board/br25/board_ac6369f_demo.c \
